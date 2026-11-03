@@ -1,6 +1,6 @@
 <!-- STATUS:START -->
 ## Status
-**Phase:** Design
+**Phase:** Playable
 **Focus:** No
 **Summary:** Personal journal app for this PC: work issue cards and a ranked wishlist of things to buy.
 **Last updated:** 2026-11-03
@@ -8,18 +8,17 @@
 ### Milestones
 - [x] Design spec approved
 - [x] Implementation plan written
-- [ ] Data store and server working
-- [ ] App shell with autosave
-- [ ] Work tab usable
-- [ ] Wishlist tab usable
+- [x] Data store and server working
+- [x] App shell with autosave
+- [x] Work tab usable
+- [x] Wishlist tab usable
+- [ ] Used day to day for a week
 
 ### Last session
-Designed the app, wrote the spec and the build plan, and set up the repo, Issues and board.
+Designed, built, reviewed and merged the whole app (Work and Wishlist tabs, autosave, daily backups). 20 tests pass; review fixes included two-tab safety and a localhost-only check.
 
 ### Next steps
-1. Build the data store that saves journal.json (#1)
-2. Add the local server and Journal.bat launcher (#2)
-3. Build the app shell with autosave (#3)
+1. Use the journal for a week and list changes (#6)
 
 ### Blockers
 None
