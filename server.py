@@ -26,6 +26,17 @@ class JournalHandler(SimpleHTTPRequestHandler):
         self.web_dir = web_dir.resolve()
         super().__init__(*args, directory=str(web_dir), **kwargs)
 
+    def parse_request(self):
+        # Only answer requests addressed to this machine, so a web page on another domain
+        # can't reach the journal by pointing its DNS at 127.0.0.1 (DNS rebinding).
+        if not super().parse_request():
+            return False
+        port = self.server.server_address[1]
+        if self.headers.get("Host", "") not in (f"localhost:{port}", f"127.0.0.1:{port}"):
+            self.send_error(403)
+            return False
+        return True
+
     def do_GET(self):
         if self.path.split("?")[0] == "/api/data":
             self.send_json(200, self.store.load())
@@ -53,6 +64,12 @@ class JournalHandler(SimpleHTTPRequestHandler):
         if resolved != self.web_dir and self.web_dir not in resolved.parents:
             return str(self.web_dir / "__not_found__")
         return str(resolved)
+
+    def end_headers(self):
+        # Always revalidate app files, so an updated app isn't masked by a cached copy.
+        if not self.path.startswith("/api/"):
+            self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
 
     def send_json(self, status: int, body: dict) -> None:
         payload = json.dumps(body, ensure_ascii=False).encode("utf-8")

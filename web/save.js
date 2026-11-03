@@ -12,8 +12,8 @@ export function createSaver({ getData, onStatus }) {
   let stopped = false;
 
   function changed() {
+    pending = true; // after a conflict this still arms the leave-page prompt
     if (stopped) return;
-    pending = true;
     clearTimeout(timer);
     timer = setTimeout(flush, DEBOUNCE_MS);
   }
@@ -31,6 +31,8 @@ export function createSaver({ getData, onStatus }) {
       });
       if (res.status === 409) {
         stopped = true;
+        pending = true; // this edit was not saved
+        clearInterval(retryTimer);
         onStatus("conflict");
         return;
       }
@@ -54,5 +56,8 @@ export function createSaver({ getData, onStatus }) {
     if (pending || inFlight) e.preventDefault();
   });
 
-  return { changed };
+  // True when every edit is saved and saving still works.
+  const isIdle = () => !pending && !inFlight && !stopped;
+
+  return { changed, isIdle };
 }

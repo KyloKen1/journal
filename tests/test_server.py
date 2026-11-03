@@ -74,6 +74,23 @@ class ServerTests(unittest.TestCase):
         resp, _ = self.request("GET", "/a.js")
         self.assertTrue(resp.getheader("Content-Type").startswith("text/javascript"))
 
+    def test_foreign_host_rejected(self):
+        # Blocks DNS-rebinding: a web page on another domain pointed at 127.0.0.1.
+        conn = http.client.HTTPConnection("127.0.0.1", self.port)
+        conn.request("GET", "/api/data", headers={"Host": f"evil.example:{self.port}"})
+        resp = conn.getresponse()
+        resp.read()
+        conn.close()
+        self.assertEqual(resp.status, 403)
+
+    def test_localhost_host_allowed(self):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port)
+        conn.request("GET", "/api/data", headers={"Host": f"localhost:{self.port}"})
+        resp = conn.getresponse()
+        resp.read()
+        conn.close()
+        self.assertEqual(resp.status, 200)
+
     def test_second_server_on_same_port_fails(self):
         with self.assertRaises(OSError):
             make_server(Path(self._tmp.name) / "data", Path(self._tmp.name) / "web", self.port)

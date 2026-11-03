@@ -142,12 +142,8 @@ export function renderWishlist(root, state, changed) {
       field("Name", text("name", "name-input")),
       field("Price (R)", el("input", {
         type: "text", inputmode: "decimal", value: item.price ?? "", placeholder: "e.g. 1 299",
-        onchange: (e) => {
-          item.price = parsePrice(e.target.value);
-          e.target.value = item.price ?? "";
-          refresh();
-          edit();
-        },
+        oninput: (e) => { item.price = parsePrice(e.target.value); refresh(); edit(); },
+        onchange: (e) => { e.target.value = item.price ?? ""; },
       })),
       field("Link", text("link")),
       field("Notes", el("textarea", {
