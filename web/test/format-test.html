@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>format.js tests</title>
+<pre id="out">Running…</pre>
+<script type="module">
+  import { formatRand, parsePrice, safeLink } from "../format.js";
+
+  const cases = [
+    ["formatRand(1299)", () => formatRand(1299), "R 1 299.00"],
+    ["formatRand(1234567.5)", () => formatRand(1234567.5), "R 1 234 567.50"],
+    ["formatRand(0)", () => formatRand(0), "R 0.00"],
+    ["formatRand(null)", () => formatRand(null), ""],
+    ['parsePrice("1299")', () => parsePrice("1299"), 1299],
+    ['parsePrice("1 299")', () => parsePrice("1 299"), 1299],
+    ['parsePrice("R1,299.50")', () => parsePrice("R1,299.50"), 1299.5],
+    ['parsePrice("R 1 299.00")', () => parsePrice("R 1 299.00"), 1299],
+    ['parsePrice("1299,50")', () => parsePrice("1299,50"), 1299.5],
+    ['parsePrice("abc")', () => parsePrice("abc"), null],
+    ['parsePrice("")', () => parsePrice(""), null],
+    ['safeLink("shop.co.za/x")', () => safeLink("shop.co.za/x"), "https://shop.co.za/x"],
+    ['safeLink("javascript:alert(1)")', () => safeLink("javascript:alert(1)"), null],
+    ['safeLink("")', () => safeLink(""), null],
+  ];
+
+  const failures = [];
+  for (const [name, run, expected] of cases) {
+    let actual;
+    try { actual = run(); } catch (e) { actual = `threw ${e}`; }
+    if (actual !== expected) failures.push(`FAIL ${name}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+  }
+  document.getElementById("out").textContent =
+    failures.length ? failures.join("\n") : `All ${cases.length} passed`;
+</script>

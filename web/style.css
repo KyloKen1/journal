@@ -1,0 +1,84 @@
+:root {
+  --bg: #f6f5f2;
+  --panel: #ffffff;
+  --text: #22211f;
+  --muted: #6d6a64;
+  --line: #e2dfd8;
+  --accent: #2f6f5e;
+  --accent-soft: #e3efe9;
+  --danger: #b3261e;
+  --danger-soft: #fbe9e7;
+  --warn-soft: #fff4d6;
+  --radius: 8px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1b1a;
+    --panel: #242423;
+    --text: #ecebe8;
+    --muted: #a19e97;
+    --line: #3a3936;
+    --accent: #7cc2ad;
+    --accent-soft: #23362f;
+    --danger: #f2a49d;
+    --danger-soft: #3d2220;
+    --warn-soft: #3a321c;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+}
+
+button, input, textarea { font: inherit; color: inherit; }
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+}
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+button.danger { color: var(--danger); }
+
+input[type="text"], input[type="search"], textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 6px 10px;
+}
+input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.topbar h1 { font-size: 18px; margin: 0; }
+.tabs { display: flex; gap: 4px; }
+.tabs button { border-color: transparent; }
+.tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.status { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+.alert, .notice { padding: 8px 20px; font-weight: 600; }
+.alert { background: var(--danger-soft); color: var(--danger); }
+.notice { background: var(--warn-soft); }
+
+main { padding: 20px; }
+
+.muted { color: var(--muted); }
+.toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
