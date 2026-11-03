@@ -82,7 +82,7 @@ main { padding: 20px; }
 
 .muted { color: var(--muted); }
 .empty { padding: 12px 4px; }
-ul { list-style: none; margin: 0; padding: 0; }
+ul, ol { list-style: none; margin: 0; padding: 0; }
 h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 24px 0 8px; }
 
 /* Work tab */
@@ -122,7 +122,45 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
 .remove:hover { color: var(--danger); }
 .actions { display: flex; gap: 8px; margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line); }
 
+/* Wishlist tab */
+.wishlist { max-width: 900px; }
+.wish-header { display: flex; align-items: center; gap: 16px; }
+.total { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hint { font-size: 13px; margin: 8px 0 12px; }
+.wish-items { display: flex; flex-direction: column; gap: 6px; }
+.wish {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.wish.open { border-color: var(--accent); }
+.wish.bought { opacity: 0.55; }
+.wish.dragging { opacity: 0.4; }
+.wish.drop-target { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.wish-row {
+  display: grid;
+  grid-template-columns: auto 2.5em minmax(0, 1.2fr) minmax(0, 1fr) auto 1.5em auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.handle { cursor: grab; color: var(--muted); font-size: 18px; padding: 0 4px; user-select: none; }
+.rank { text-align: right; font-variant-numeric: tabular-nums; }
+.wish-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wish-notes { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wish-price { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wish-link a { color: var(--accent); text-decoration: none; font-weight: 700; }
+.wish-editor { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 4px 16px 16px; }
+.wish-editor .actions { grid-column: 1 / -1; margin-top: 4px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.field input, .field textarea { color: var(--text); font-size: 15px; }
+.field:has(textarea) { grid-column: 1 / -1; }
+
 @media (max-width: 700px) {
+  .wish-row { grid-template-columns: auto minmax(0, 1fr) auto 1.5em auto; }
+  .wish-row .rank, .wish-row .wish-notes { display: none; }
+  .wish-editor { grid-template-columns: 1fr; }
   .work { grid-template-columns: 1fr; }
   .issue-list { position: static; }
 }
