@@ -51,7 +51,7 @@ tests/test_server.py                    + API tests
 {
   "items": {
     "<wishlist item id>": {
-      "checked": "2026-11-10T08:04:12",
+      "checked": "2026-11-09T08:04:12",
       "note": "",
       "options": [
         {
