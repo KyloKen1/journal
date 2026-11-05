@@ -4,7 +4,7 @@
 
 **Goal:** Claude posts 2–3 buy options per wishlist item into the journal, weekly and on request; the owner accepts or dismisses them.
 
-**Architecture:** `suggestions.py` owns `data/suggestions.json`, validating every write against the spec's rules and the live wishlist. `server.py` exposes it at `/api/suggestions`. `web/suggest.js` holds the Accept logic and the suggestions UI used by `wishlist.js`. A project skill describes the update procedure; a Claude desktop scheduled task runs it every Monday.
+**Architecture:** `suggestions.py` owns `data/suggestions.json`, validating every write against the spec's rules and the live wishlist. `server.py` exposes it at `/api/suggestions`. `web/suggest.js` holds the Accept logic and the suggestions UI used by `wishlist.js`. A project skill describes the update procedure, which runs only when the owner asks.
 
 **Tech Stack:** Python 3.13 stdlib, plain ES modules (existing stack, nothing new).
 
@@ -18,7 +18,7 @@
 - `checked` is set by the server: local time `YYYY-MM-DDTHH:MM:SS`.
 - Damaged file → `suggestions.broken-YYYY-MM-DD-HHMMSS.json`, treated as empty.
 - UI copy: badge `3 options` / `1 option` / `note`; header `Suggestions checked <ddd d MMM>` (e.g. `Mon 9 Nov`); card footer `Checked <ddd d MMM>`; buttons `Accept`, `Dismiss all`; Accept prepends `Was: <old name>` to notes.
-- Schedule: every Monday 08:00, working folder `C:\Dev\journal`, prompt `Use the update-wishlist skill. This is a scheduled run.`
+- No schedule: updates run only when the owner asks (revised after the first run).
 
 ## Review Focus
 
@@ -210,12 +210,13 @@
 
 ---
 
-### Task 6: Weekly schedule
+### Task 6: Ask-first runs and README (revised: no schedule)
 
-**Files:** none (Claude desktop scheduled task)
+**Files:**
+- Modify: `.claude/skills/update-wishlist/SKILL.md`, `README.md`
 
-- [ ] **Step 1: Create the scheduled task** with the scheduled-tasks tool: name `Update wishlist`, weekly Monday 08:00, folder `C:\Dev\journal`, prompt from Global Constraints.
+- [ ] **Step 1: Update the skill** per the revised spec §6 step 3: ask the owner about every unbought item without both `Want:` and `Budget:` lines in its notes, save the answers as the first two note lines via `PUT /api/data` (re-read first; on 409 re-read and retry once), skip items the owner skips, keep options within budget. Remove the scheduled-run rules.
 
-- [ ] **Step 2: Verify** — list scheduled tasks and confirm the entry and next run time (next Monday 08:00). Tell the owner how to press **Run now** and that the first run needs their one-time permission approvals.
+- [ ] **Step 2: Second real run** — ask the owner about the 7 items, save the answers, redo the research. Expected: notes on answered items start with `Want:` and `Budget:`; every PUT to `/api/suggestions` returns 200.
 
-- [ ] **Step 3: Update README** — add a "Price suggestions" paragraph to the README body (not the Status block) explaining weekly runs, "update my wishlist", and Accept/Dismiss; commit with `git commit -m "Document wishlist price suggestions"`.
+- [ ] **Step 3: Update README** — add a "Price suggestions" paragraph to the README body (not the Status block): say "update my wishlist" in a Claude session in this folder; Claude asks what you want and your budget, saves that in the notes, then posts options to Accept or Dismiss. Commit with `git commit -m "Document wishlist price suggestions"`.
