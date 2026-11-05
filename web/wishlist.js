@@ -1,7 +1,7 @@
 import { el } from "./dom.js";
 import { formatRand, newId, parsePrice, safeLink } from "./format.js";
 import {
-  acceptOption, dismissSuggestions, formatCheckedDate, latestChecked, renderSuggestions,
+  acceptedQueue, acceptOption, dismissSuggestions, formatCheckedDate, latestChecked, renderSuggestions,
 } from "./suggest.js";
 
 // View settings survive switching tabs, but not a page reload.
@@ -92,7 +92,7 @@ export function renderWishlist(root, state, changed) {
     acceptOption(item, option);
     edit();
     delete state.suggestions[item.id];
-    dismissSuggestions(item.id); // if this fails, the suggestion reappears until dismissed
+    acceptedQueue.add(item.id); // cleared on the server once this edit has saved
     renderList();
   }
 

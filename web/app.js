@@ -1,5 +1,5 @@
 import { createSaver } from "./save.js";
-import { loadSuggestions } from "./suggest.js";
+import { acceptedQueue, loadSuggestions } from "./suggest.js";
 import { renderWork } from "./work.js";
 import { renderWishlist } from "./wishlist.js";
 
@@ -24,6 +24,7 @@ const saver = createSaver({
       state.version = version;
       statusEl.textContent = "Saved";
       showAlert(null);
+      acceptedQueue.flush();
     } else if (status === "saving") {
       statusEl.textContent = "Saving…";
     } else if (status === "offline") {
@@ -87,6 +88,9 @@ async function refreshIfStale() {
   try {
     const data = await (await fetch("/api/data")).json();
     const suggestions = await loadSuggestions();
+    for (const id of Object.keys(suggestions)) {
+      if (acceptedQueue.has(id)) delete suggestions[id]; // accepted here, not yet cleared on the server
+    }
     const journalMoved = data.version !== state.version;
     const suggestionsMoved = JSON.stringify(suggestions) !== JSON.stringify(state.suggestions);
     if ((journalMoved || suggestionsMoved) && saver.isIdle()) {

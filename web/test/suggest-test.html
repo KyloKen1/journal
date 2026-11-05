@@ -3,7 +3,7 @@
 <title>suggest.js tests</title>
 <pre id="out">Running…</pre>
 <script type="module">
-  import { acceptOption, formatCheckedDate, latestChecked } from "../suggest.js";
+  import { acceptOption, createDismissQueue, formatCheckedDate, latestChecked } from "../suggest.js";
 
   const option = { name: "Kingston 16GB DDR4", price: 649, link: "https://x.co/r", shop: "Evetech", note: "" };
   const item = (notes = "") => ({ name: "RAM", price: null, link: "", notes, bought: false });
@@ -20,10 +20,29 @@
     ['formatCheckedDate("2026-11-03T08:00:00")', () => formatCheckedDate("2026-11-03T08:00:00"), "Tue 3 Nov"],
   ];
 
+  // Accepted suggestions are only cleared on the server after the journal has saved.
+  const queueCases = [
+    ["queue waits for flush before dismissing", async () => {
+      const calls = [];
+      const q = createDismissQueue(async (id) => { calls.push(id); return true; });
+      q.add("a");
+      const before = calls.length;
+      await q.flush();
+      return `${before} ${calls.join()} ${q.has("a")}`;
+    }, "0 a false"],
+    ["queue keeps ids whose dismiss failed", async () => {
+      const q = createDismissQueue(async () => false);
+      q.add("a");
+      await q.flush();
+      return q.has("a");
+    }, true],
+  ];
+  for (const [name, run, expected] of queueCases) cases.push([name, run, expected]);
+
   const failures = [];
   for (const [name, run, expected] of cases) {
     let actual;
-    try { actual = run(); } catch (e) { actual = `threw ${e}`; }
+    try { actual = await run(); } catch (e) { actual = `threw ${e}`; }
     if (actual !== expected) failures.push(`FAIL ${name}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
   }
   document.getElementById("out").textContent =

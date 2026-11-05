@@ -44,6 +44,23 @@ export async function dismissSuggestions(itemId) {
   }
 }
 
+// Items whose suggestion was accepted. They are cleared on the server only once the journal has
+// saved the accepted change, so a failed save never loses Claude's research for that item.
+export function createDismissQueue(dismiss) {
+  const ids = new Set();
+  return {
+    add: (id) => ids.add(id),
+    has: (id) => ids.has(id),
+    async flush() {
+      for (const id of [...ids]) {
+        if (await dismiss(id)) ids.delete(id);
+      }
+    },
+  };
+}
+
+export const acceptedQueue = createDismissQueue(dismissSuggestions);
+
 export function renderSuggestions(entry, { onAccept, onDismiss }) {
   return el("section", { class: "suggestions" },
     el("h3", {}, "Suggestions"),

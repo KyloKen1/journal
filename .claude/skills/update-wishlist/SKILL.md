@@ -38,33 +38,39 @@ An item is **answered** when its notes contain both a line starting `Want:` and 
 
 In **one message**, ask about every unanswered item: what exactly they want (type, size, brand, what it's for…) and their budget in rand. Give a short example per item so it's easy to answer, and say they can reply "skip" for an item or "no budget". In the same message, list the saved `Want:`/`Budget:` of answered items and ask whether any changed. Then wait for the reply — don't search before it.
 
-Save the answers into the notes (skipped items are left alone and left out of this run):
+Save the answers into the notes (skipped items are left alone and left out of this run). Write the answers as **JSON** to a file in your scratchpad — JSON escaping keeps answers like `27"` intact — then run the save script with that file:
 
 ```bash
-python -I - <<'EOF'
-import json, urllib.error, urllib.request
-answers = {  # item id -> (want, budget text)
-    "<item id>": ("27-inch monitor for work, IPS", "R 3 000"),
-}
+cat > "<scratchpad>/answers.json" <<'EOF'
+{"<item id>": {"want": "at least 27\" monitor, for gaming", "budget": "max R 4 000"}}
+EOF
+python -I - "<scratchpad>/answers.json" <<'EOF'
+import json, sys, urllib.error, urllib.request
+answers = json.load(open(sys.argv[1], encoding="utf-8"))
 base = "http://127.0.0.1:8765/api/data"
 for attempt in range(2):
     data = json.load(urllib.request.urlopen(base))
+    found = set()
     for item in data["wishlist"]:
         if item["id"] in answers:
-            want, budget = answers[item["id"]]
+            found.add(item["id"])
+            a = answers[item["id"]]
             lines = item["notes"].split("\n") if item["notes"] else []
             rest = [l for l in lines if not l.startswith(("Want:", "Budget:"))]
-            item["notes"] = "\n".join([f"Want: {want}", f"Budget: {budget}", *rest])
+            item["notes"] = "\n".join([f"Want: {a['want']}", f"Budget: {a['budget']}", *rest])
     body = json.dumps({k: data[k] for k in ("version", "issues", "wishlist")}).encode()
     try:
         urllib.request.urlopen(urllib.request.Request(base, data=body, method="PUT"))
-        print("saved"); break
+        print("saved", len(found), "items")
+        missing = set(answers) - found
+        if missing: print("not found (deleted meanwhile?):", sorted(missing))
+        break
     except urllib.error.HTTPError as e:
         if e.code != 409 or attempt: raise
 EOF
 ```
 
-A `409` means the owner's journal tab saved at the same moment; the script re-reads and retries once. If it still fails, tell the owner their answers weren't saved and carry on with the search.
+A `409` means the owner's journal tab saved at the same moment; the script re-reads and retries once. If it still fails, tell the owner their answers weren't saved and carry on with the search. If it reports items not found, tell the owner.
 
 ## 4. Research each item
 
