@@ -1,4 +1,5 @@
 import { createSaver } from "./save.js";
+import { loadSuggestions } from "./suggest.js";
 import { renderWork } from "./work.js";
 import { renderWishlist } from "./wishlist.js";
 
@@ -6,7 +7,8 @@ const OFFLINE = "Not saved — start Journal.bat";
 const CONFLICT = "This journal was changed in another tab. Reload to continue.";
 const DAMAGED = "Your journal file was damaged and set aside. Restore a copy from data\\backups.";
 
-const state = { version: 0, issues: [], wishlist: [] };
+// suggestions are Claude's, kept in their own file; the saver never sends them.
+const state = { version: 0, issues: [], wishlist: [], suggestions: {} };
 const tabs = { work: renderWork, wishlist: renderWishlist };
 let currentTab = "work";
 
@@ -63,6 +65,7 @@ async function start() {
     if (!res.ok) throw new Error(`load failed: ${res.status}`);
     const data = await res.json();
     Object.assign(state, { version: data.version, issues: data.issues, wishlist: data.wishlist });
+    state.suggestions = await loadSuggestions();
     if (data.damaged) {
       noticeEl.textContent = DAMAGED;
       noticeEl.hidden = false;
@@ -83,8 +86,11 @@ async function refreshIfStale() {
   if (!loaded || document.hidden || !saver.isIdle()) return;
   try {
     const data = await (await fetch("/api/data")).json();
-    if (data.version !== state.version && saver.isIdle()) {
-      Object.assign(state, { version: data.version, issues: data.issues, wishlist: data.wishlist });
+    const suggestions = await loadSuggestions();
+    const journalMoved = data.version !== state.version;
+    const suggestionsMoved = JSON.stringify(suggestions) !== JSON.stringify(state.suggestions);
+    if ((journalMoved || suggestionsMoved) && saver.isIdle()) {
+      Object.assign(state, { version: data.version, issues: data.issues, wishlist: data.wishlist, suggestions });
       show(currentTab);
     }
   } catch {

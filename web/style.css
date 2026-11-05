@@ -147,7 +147,36 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
 }
 .handle { cursor: grab; color: var(--muted); font-size: 18px; padding: 0 4px; user-select: none; }
 .rank { text-align: right; font-variant-numeric: tabular-nums; }
+.wish-name-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .wish-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge {
+  flex: none;
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  white-space: nowrap;
+}
+.checked { font-size: 13px; }
+
+/* Claude's suggestions, inside the item editor */
+.suggestions { grid-column: 1 / -1; }
+.suggestions h3 { margin-top: 8px; }
+.option-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.option-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.option-card a { color: var(--accent); }
+.option-price { font-variant-numeric: tabular-nums; }
+.option-card button { margin-top: auto; align-self: flex-start; }
+.suggestions-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
 .wish-notes { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wish-price { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wish-link a { color: var(--accent); text-decoration: none; font-weight: 700; }

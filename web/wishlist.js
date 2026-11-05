@@ -1,5 +1,8 @@
 import { el } from "./dom.js";
 import { formatRand, newId, parsePrice, safeLink } from "./format.js";
+import {
+  acceptOption, dismissSuggestions, formatCheckedDate, latestChecked, renderSuggestions,
+} from "./suggest.js";
 
 // View settings survive switching tabs, but not a page reload.
 let showBought = false;
@@ -8,12 +11,17 @@ let openId = null;
 export function renderWishlist(root, state, changed) {
   const listEl = el("ol", { class: "wish-items" });
   const totalEl = el("span", { class: "total" });
+  const checkedEl = el("span", { class: "checked muted" });
   let dragId = null;
+
+  // Suggestions only matter for items still to buy.
+  const suggestionsFor = (item) => (item.bought ? null : state.suggestions[item.id] ?? null);
 
   root.append(
     el("div", { class: "wishlist" },
       el("div", { class: "wish-header" },
         el("button", { type: "button", class: "primary", onclick: addItem }, "+ Add item"),
+        checkedEl,
         totalEl,
         el("label", { class: "toggle" },
           el("input", {
@@ -68,6 +76,31 @@ export function renderWishlist(root, state, changed) {
       listEl.append(el("li", { class: "muted empty" }, state.wishlist.length ? "Everything here is bought." : "Nothing on the wishlist yet."));
     }
     renderTotal();
+    const checked = latestChecked(state.suggestions);
+    checkedEl.textContent = checked ? `Suggestions checked ${formatCheckedDate(checked)}` : "";
+  }
+
+  function badge(item) {
+    const entry = suggestionsFor(item);
+    if (!entry) return null;
+    const n = entry.options.length;
+    const text = n === 0 ? "note" : n === 1 ? "1 option" : `${n} options`;
+    return el("span", { class: "badge", title: "Claude's suggestions — open the item to see them" }, text);
+  }
+
+  function acceptSuggestion(item, option) {
+    acceptOption(item, option);
+    edit();
+    delete state.suggestions[item.id];
+    dismissSuggestions(item.id); // if this fails, the suggestion reappears until dismissed
+    renderList();
+  }
+
+  async function dismissAll(item) {
+    if (await dismissSuggestions(item.id)) {
+      delete state.suggestions[item.id];
+      renderList();
+    }
   }
 
   function renderRow(item, rank) {
@@ -114,7 +147,7 @@ export function renderWishlist(root, state, changed) {
           ondragend: () => { dragId = null; li.classList.remove("dragging"); },
         }, "⠿"),
         el("span", { class: "rank muted" }, `${rank}.`),
-        nameEl,
+        el("span", { class: "wish-name-cell" }, nameEl, badge(item)),
         notesEl,
         priceEl,
         linkEl,
@@ -150,6 +183,10 @@ export function renderWishlist(root, state, changed) {
         rows: 3, value: item.notes,
         oninput: (e) => { item.notes = e.target.value; refresh(); edit(); },
       })),
+      suggestionsFor(item) && renderSuggestions(suggestionsFor(item), {
+        onAccept: (option) => acceptSuggestion(item, option),
+        onDismiss: () => dismissAll(item),
+      }),
       el("div", { class: "actions" },
         el("button", { type: "button", onclick: () => { openId = null; renderList(); } }, "Done"),
         el("button", {
