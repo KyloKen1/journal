@@ -1,0 +1,31 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>suggest.js tests</title>
+<pre id="out">Running…</pre>
+<script type="module">
+  import { acceptOption, formatCheckedDate, latestChecked } from "../suggest.js";
+
+  const option = { name: "Kingston 16GB DDR4", price: 649, link: "https://x.co/r", shop: "Evetech", note: "" };
+  const item = (notes = "") => ({ name: "RAM", price: null, link: "", notes, bought: false });
+  const accepted = (it, opt = option) => { acceptOption(it, opt); return it; };
+
+  const cases = [
+    ["accept copies name/price/link and adds Was:", () => JSON.stringify(accepted(item())),
+      JSON.stringify({ name: "Kingston 16GB DDR4", price: 649, link: "https://x.co/r", notes: "Was: RAM", bought: false })],
+    ["accept keeps existing notes below Was:", () => accepted(item("for the work PC")).notes, "Was: RAM\nfor the work PC"],
+    ["accept with the same name leaves notes alone", () => accepted(item("x"), { ...option, name: "RAM" }).notes, "x"],
+    ["latestChecked picks the newest", () => latestChecked({ a: { checked: "2026-11-03T08:00:00" }, b: { checked: "2026-11-09T08:04:12" } }), "2026-11-09T08:04:12"],
+    ["latestChecked of nothing is null", () => latestChecked({}), null],
+    ['formatCheckedDate("2026-11-09T08:04:12")', () => formatCheckedDate("2026-11-09T08:04:12"), "Mon 9 Nov"],
+    ['formatCheckedDate("2026-11-03T08:00:00")', () => formatCheckedDate("2026-11-03T08:00:00"), "Tue 3 Nov"],
+  ];
+
+  const failures = [];
+  for (const [name, run, expected] of cases) {
+    let actual;
+    try { actual = run(); } catch (e) { actual = `threw ${e}`; }
+    if (actual !== expected) failures.push(`FAIL ${name}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+  }
+  document.getElementById("out").textContent =
+    failures.length ? failures.join("\n") : `All ${cases.length} passed`;
+</script>
