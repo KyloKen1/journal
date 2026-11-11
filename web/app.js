@@ -13,6 +13,7 @@ const OFFLINE = "Not saved — no connection. Retrying.";
 const LOAD_OFFLINE = "Can't reach GitHub — no connection. Retrying.";
 const CONFLICT = "This list was changed on another device. Reload to continue.";
 const UNREADABLE = "The saved list could not be read.";
+const MISSING = "The list file (journal.json) is missing from the data repo. Restore it from the repo's history, then reload.";
 const BAD_TOKEN = "GitHub did not accept this device's token. Enter a new one.";
 const RETRY_LOAD_MS = 10000;
 
@@ -103,8 +104,8 @@ forgetEl.addEventListener("click", () => {
 });
 
 // The file could not be understood: show nothing editable and never save over it.
-function showUnreadable() {
-  noticeEl.textContent = UNREADABLE;
+function showUnreadable(text = UNREADABLE) {
+  noticeEl.textContent = text;
   noticeEl.hidden = false;
   view.inert = true;
 }
@@ -121,6 +122,7 @@ async function start() {
   } catch (error) {
     if (error.kind === "auth") showSetup(BAD_TOKEN, start);
     else if (error.kind === "invalid") showUnreadable();
+    else if (error.kind === "missing") showUnreadable(MISSING);
     else {
       showAlert(error.kind === "offline" ? LOAD_OFFLINE : `Can't load the list — GitHub error ${error.status}. Retrying.`);
       setTimeout(start, RETRY_LOAD_MS);
@@ -151,10 +153,14 @@ async function start() {
 // elsewhere instead of running into a conflict on the next edit.
 async function refreshIfStale() {
   if (!loaded || document.hidden || !saver.isIdle()) return;
+  const shaBefore = state.sha;
   try {
     const file = await storage.load(JOURNAL_PATH);
     const journal = normalizeJournal(file.data);
     const suggestions = await loadSuggestions();
+    // An edit was saved from this page while we were loading: the copy we fetched may be
+    // the older one, so it must not replace what is on screen.
+    if (state.sha !== shaBefore) return;
     // Accepted here but not yet cleared in the data repo: keep them hidden.
     for (const id of Object.keys(suggestions.items)) {
       if (acceptedQueue.has(id)) delete suggestions.items[id];

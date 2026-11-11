@@ -63,7 +63,7 @@ The token is kept in that browser only and sent only to GitHub. One limit: brows
 - `python tools/webtests.py` runs the browser tests in headless Chrome.
 - `python -m unittest discover -s tests -t .` runs the data tool's tests.
 - `web/test/todo-demo.html` shows the To-Do tab on sample data (serve `web/` with `python -m http.server`).
-- Pushing to `main` publishes `web/` to GitHub Pages.
+- Pushing to `main` runs both test suites, then publishes `web/` to GitHub Pages. A failing test stops the publish.
 
 ## Docs
 

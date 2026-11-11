@@ -1,4 +1,4 @@
-// Small helpers shared by the Work and Wishlist tabs.
+// Small helpers shared by the To-Do and Wishlist tabs.
 
 export function formatRand(n) {
   if (n === null || n === undefined) return "";

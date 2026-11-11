@@ -6,6 +6,7 @@ const API = "https://api.github.com";
 
 // kind: "auth" (token missing, rejected, or can't see the repo), "conflict" (file changed
 // since it was loaded), "offline" (no answer), "invalid" (file isn't readable JSON),
+// "missing" (the token works but the file isn't in the repo),
 // "http" (any other GitHub error; status holds the code).
 export class StorageError extends Error {
   constructor(kind, status = null) {
@@ -37,19 +38,31 @@ export function createStorage({ repo, getToken, fetch = globalThis.fetch }) {
   // GitHub wants writes to a repo one at a time; parallel ones can be refused with 409.
   let writes = Promise.resolve();
 
+  const headers = () => ({ Authorization: `Bearer ${getToken()}`, Accept: "application/vnd.github+json" });
+
+  async function canSeeRepo() {
+    try {
+      return (await fetch(`${API}/repos/${repo}`, { cache: "no-store", headers: headers() })).ok;
+    } catch {
+      throw new StorageError("offline");
+    }
+  }
+
   async function request(path, init = {}) {
     let res;
     try {
       res = await fetch(`${API}/repos/${repo}/contents/${path}`, {
         ...init,
         cache: "no-store",
-        headers: { Authorization: `Bearer ${getToken()}`, Accept: "application/vnd.github+json" },
+        headers: headers(),
       });
     } catch {
       throw new StorageError("offline");
     }
-    // 404 is what GitHub answers when the token can't see a private repo.
     if (rateLimited(res)) throw new StorageError("http", res.status);
+    // 404 is what GitHub answers both when the token can't see the private repo and when
+    // the file isn't there. Asking for the repo itself tells the two apart.
+    if (res.status === 404 && (await canSeeRepo())) throw new StorageError("missing", 404);
     if ([401, 403, 404].includes(res.status)) throw new StorageError("auth", res.status);
     if ([409, 422].includes(res.status)) throw new StorageError("conflict", res.status);
     if (!res.ok) throw new StorageError("http", res.status);

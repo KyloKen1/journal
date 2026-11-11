@@ -6,6 +6,7 @@ Exit code 0 only if every page reports "All N passed".
 
 import html
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -21,6 +22,8 @@ BROWSERS = [
     Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
     Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
 ]
+# Chrome's sandbox does not start on the workflow's Linux runner; the tests only load our own pages.
+EXTRA_FLAGS = [] if sys.platform == "win32" else ["--no-sandbox"]
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -30,11 +33,23 @@ class QuietHandler(SimpleHTTPRequestHandler):
         pass
 
 
+def find_browser() -> Path | None:
+    for path in BROWSERS:
+        if path.exists():
+            return path
+    # Linux (the GitHub workflow): Chrome is on the PATH.
+    for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
+        found = shutil.which(name)
+        if found:
+            return Path(found)
+    return None
+
+
 def run_page(browser: Path, url: str) -> str:
     # Its own profile folder, so it never attaches to a browser window the owner has open.
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile:
         result = subprocess.run(
-            [str(browser), "--headless", "--disable-gpu", "--no-first-run",
+            [str(browser), "--headless", "--disable-gpu", "--no-first-run", *EXTRA_FLAGS,
              f"--user-data-dir={profile}", "--window-size=1920,1080", "--virtual-time-budget=20000", "--dump-dom", url],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
         )
@@ -43,7 +58,7 @@ def run_page(browser: Path, url: str) -> str:
 
 
 def main(names: list[str]) -> int:
-    browser = next((p for p in BROWSERS if p.exists()), None)
+    browser = find_browser()
     if browser is None:
         print("Google Chrome not found")
         return 2

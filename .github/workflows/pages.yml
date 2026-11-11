@@ -1,11 +1,11 @@
-# Publishes the web/ folder to GitHub Pages whenever main changes.
+# Runs the tests, then publishes the web/ folder to GitHub Pages whenever main changes.
 # The page holds no data: tasks and wishlist live in the private journal-data repo.
 name: Publish page
 
 on:
   push:
     branches: [main]
-    paths: ["web/**", ".github/workflows/pages.yml"]
+    paths: ["web/**", "tools/**", "tests/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -18,13 +18,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A failing test stops the publish, so a broken page never replaces the live one.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: python3 tools/webtests.py
+      - run: python3 -m unittest discover -s tests -t .
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # Test and demo pages stay out of the public site: they have no content security policy.
       - run: rm -rf web/test
       - uses: actions/configure-pages@v5
