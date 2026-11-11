@@ -103,6 +103,45 @@
       const f = fake(() => json(200, { sha: "x", encoding: "base64", content: toBase64("not json {") }));
       check("non-JSON content is invalid", await kindOf(f.storage.load("journal.json")) === "invalid");
     }
+
+    // GitHub wants writes to a repo one at a time; parallel ones can be refused with 409.
+    {
+      let release;
+      const gate = new Promise((r) => { release = r; });
+      const f = fake(
+        async () => { await gate; return json(200, { content: { sha: "one" } }); },
+        () => json(200, { content: { sha: "two" } }),
+      );
+      const first = f.storage.save("journal.json", {}, "a");
+      const second = f.storage.save("suggestions.json", {}, "b");
+      await new Promise((r) => setTimeout(r, 20));
+      check("a second save waits for the first to finish", f.calls.length === 1);
+      release();
+      check("both queued saves complete in order", (await first) === "one" && (await second) === "two" && f.calls.length === 2);
+    }
+    {
+      const f = fake(() => json(500, {}), () => json(200, { content: { sha: "ok" } }));
+      await kindOf(f.storage.save("journal.json", {}, "a"));
+      check("a failed save does not block the next one", (await f.storage.save("journal.json", {}, "a")) === "ok");
+    }
+
+    // A 403 that is a rate limit is not a bad token.
+    {
+      const limited = (headers) => () => new Response("{}", { status: 403, headers });
+      check("403 with retry-after is a GitHub error, not a bad token",
+        await kindOf(fake(limited({ "retry-after": "60" })).storage.save("journal.json", {}, "a")) === "http");
+      check("403 with no rate limit left is a GitHub error, not a bad token",
+        await kindOf(fake(limited({ "x-ratelimit-remaining": "0" })).storage.load("journal.json")) === "http");
+    }
+
+    // Saves are sent keepalive so one started as the page is hidden still completes.
+    {
+      const f = fake(() => json(200, { content: { sha: "k" } }), () => json(200, { content: { sha: "k2" } }));
+      await f.storage.save("journal.json", { small: true }, "a");
+      await f.storage.save("journal.json", { big: "x".repeat(70000) }, "k");
+      check("a small save is sent keepalive", f.calls[0].init.keepalive === true);
+      check("a save too big for keepalive is sent normally", !f.calls[1].init.keepalive);
+    }
   } catch (e) {
     failures.push(`FAIL test page crashed: ${e}`);
   }

@@ -54,7 +54,8 @@ Claude scheduled task on this PC, weekdays 08:00
 ### Access token
 - The first time a device opens the page, it shows a setup screen asking for a GitHub **fine-grained personal access token**. The owner creates it on github.com, limited to the `journal-data` repo only, with one permission: *Contents — read and write*.
 - The token is stored in that browser's local storage and sent only to `api.github.com`. A **Forget this device** button removes it.
-- The page loads no scripts from other sites, and a content security policy in `index.html` allows network requests only to `api.github.com`, so nothing else can read the token.
+- The page loads no scripts from other sites, and a content security policy in `index.html` allows network requests only to `api.github.com`, so nothing on this page can send the token anywhere else. Test and demo pages are not published.
+- **Limit:** browser storage is shared by every page under `kyloken1.github.io`. If another of the owner's repos is later published with GitHub Pages on this account, its pages could read this token. Today no other repo is. A custom domain for the journal would remove the limit.
 - Anyone who opens the public address without a token sees only the setup screen.
 - The owner creates and pastes the token. Claude does not handle it.
 
@@ -209,7 +210,8 @@ Same behaviour as today, still only on request. The `update-wishlist` skill read
 
 ## 6. Saving
 
-- Every edit triggers an autosave about 3 seconds after the last change (was 1 second), so a burst of typing makes one commit, not many.
+- Every edit triggers an autosave about 3 seconds after the last change (was 1 second), so a burst of typing makes one commit, not many. When the page is hidden or closed (switching apps on the phone), a waiting edit is saved at once.
+- Saves go to GitHub one at a time. If GitHub refuses a save, the page first checks whether the file really changed: if its own save is already there, or nothing changed, it carries on; only a real change elsewhere is treated as a conflict.
 - The page sends the whole `journal.json` with the `sha` it last loaded or saved.
 - Accepting or dismissing a suggestion saves `suggestions.json` the same way. If that file changed in the meantime (Claude's morning check ran), the page reloads it, re-applies the removal and saves again.
 - When the page regains focus with nothing unsaved, it reloads both files and shows any changes made on another device (as it does today between tabs).
@@ -224,6 +226,7 @@ Same behaviour as today, still only on request. The `update-wishlist` skill read
 | Cannot load at start-up | Same red bar; the list is not shown until loading succeeds, so nothing is typed onto an empty copy. |
 | List changed on another device since this one loaded (GitHub answers 409) | "This list was changed on another device. Reload to continue." The page goes read-only, as it does today. |
 | `journal.json` is not valid data | "The saved list could not be read." The page stays read-only and never overwrites the file. Earlier versions are in the `journal-data` history. |
+| GitHub asks the page to slow down (403 with a rate limit) | Treated as a GitHub error and retried, not as a bad token. |
 | Any other save error | Red bar with GitHub's status code: "Not saved — GitHub error 500. Retrying." (covers Issue #7) |
 | Leaving the page with unsaved changes | Browser's "Leave site?" prompt. |
 

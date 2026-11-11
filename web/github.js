@@ -26,7 +26,17 @@ function decode(base64) {
   return new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)));
 }
 
+// Browsers refuse a keepalive request with a body over 64 KB.
+const KEEPALIVE_LIMIT = 60_000;
+
+// A 403 can mean "slow down" rather than "bad token".
+const rateLimited = (res) =>
+  res.status === 403 && (res.headers.has("retry-after") || res.headers.get("x-ratelimit-remaining") === "0");
+
 export function createStorage({ repo, getToken, fetch = globalThis.fetch }) {
+  // GitHub wants writes to a repo one at a time; parallel ones can be refused with 409.
+  let writes = Promise.resolve();
+
   async function request(path, init = {}) {
     let res;
     try {
@@ -39,6 +49,7 @@ export function createStorage({ repo, getToken, fetch = globalThis.fetch }) {
       throw new StorageError("offline");
     }
     // 404 is what GitHub answers when the token can't see a private repo.
+    if (rateLimited(res)) throw new StorageError("http", res.status);
     if ([401, 403, 404].includes(res.status)) throw new StorageError("auth", res.status);
     if ([409, 422].includes(res.status)) throw new StorageError("conflict", res.status);
     if (!res.ok) throw new StorageError("http", res.status);
@@ -60,10 +71,17 @@ export function createStorage({ repo, getToken, fetch = globalThis.fetch }) {
     }
   }
 
-  async function save(path, data, sha) {
-    const body = { message: `Update ${path}`, content: encode(JSON.stringify(data, null, 2)), sha };
-    const result = await request(path, { method: "PUT", body: JSON.stringify(body) });
-    return result.content.sha;
+  function save(path, data, sha) {
+    const body = JSON.stringify({ message: `Update ${path}`, content: encode(JSON.stringify(data, null, 2)), sha });
+    const send = async () => {
+      // keepalive lets a save that starts as the page is hidden or closed still finish.
+      const result = await request(path, { method: "PUT", body, keepalive: body.length < KEEPALIVE_LIMIT });
+      if (typeof result?.content?.sha !== "string") throw new StorageError("invalid");
+      return result.content.sha;
+    };
+    const result = writes.then(send);
+    writes = result.catch(() => {}); // a failed save must not block the next one
+    return result;
   }
 
   return { load, save };

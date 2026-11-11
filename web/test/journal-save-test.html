@@ -1,0 +1,79 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>journal-save.js tests</title>
+<pre id="out">Running…</pre>
+<script type="module">
+  const failures = [];
+  let count = 0;
+  const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
+
+  try {
+    const { saveChecked } = await import("../journal-save.js");
+    const { StorageError } = await import("../github.js");
+
+    // A fake data repo with one file. `script` lists what each save attempt does:
+    // "ok", "conflict-unchanged" (GitHub says 409 though nothing changed), "lost-response"
+    // (the save lands but the answer never arrives as success), or an error kind to throw.
+    function fakeStorage(initial, ...script) {
+      const repo = { data: structuredClone(initial), version: 1, saves: 0, loads: 0 };
+      const land = (data) => { repo.data = structuredClone(data); repo.version++; };
+      return {
+        repo,
+        async load() { repo.loads++; return { data: structuredClone(repo.data), sha: `v${repo.version}` }; },
+        async save(path, data, sha) {
+          repo.saves++;
+          const step = script.shift() ?? "ok";
+          if (step === "conflict-unchanged") throw new StorageError("conflict", 409);
+          if (step === "lost-response") { land(data); throw new StorageError("conflict", 409); }
+          if (step !== "ok") throw new StorageError(step);
+          if (sha !== `v${repo.version}`) throw new StorageError("conflict", 409);
+          land(data);
+          return `v${repo.version}`;
+        },
+      };
+    }
+    const kindOf = async (promise) => { try { await promise; return "no error"; } catch (e) { return e.kind ?? `other: ${e}`; } };
+    const mine = { todos: [{ id: "a", title: "mine" }], wishlist: [] };
+
+    {
+      const s = fakeStorage({ todos: [], wishlist: [] });
+      check("a normal save returns the new sha", (await saveChecked(s, "journal.json", mine, "v1")) === "v2" && s.repo.loads === 0);
+    }
+    {
+      // The save landed but the page never heard back; the retry with the old sha is refused.
+      const s = fakeStorage({ todos: [], wishlist: [] }, "lost-response");
+      const sha = await saveChecked(s, "journal.json", mine, "v1");
+      check("a refused save whose content is already there counts as saved", sha === "v2" && s.repo.saves === 1);
+    }
+    {
+      const s = fakeStorage({ todos: [], wishlist: [] }, "conflict-unchanged");
+      const sha = await saveChecked(s, "journal.json", mine, "v1");
+      check("a refusal with the file unchanged is tried once more", sha === "v2" && s.repo.saves === 2 && s.repo.data.todos[0].title === "mine");
+    }
+    {
+      const s = fakeStorage({ todos: [], wishlist: [] }, "conflict-unchanged", "conflict-unchanged");
+      check("a second refusal is reported as a conflict", (await kindOf(saveChecked(s, "journal.json", mine, "v1"))) === "conflict" && s.repo.saves === 2);
+    }
+    {
+      // Really changed on another device: never overwrite it.
+      const s = fakeStorage({ todos: [], wishlist: [] });
+      s.repo.data = { todos: [{ id: "b", title: "theirs" }], wishlist: [] };
+      s.repo.version = 2;
+      check("a real change elsewhere is a conflict", (await kindOf(saveChecked(s, "journal.json", mine, "v1"))) === "conflict");
+      check("the other device's version is left alone", s.repo.data.todos[0].title === "theirs" && s.repo.saves === 1);
+    }
+    {
+      const s = fakeStorage({ todos: [], wishlist: [] }, "offline");
+      check("other errors pass straight through", (await kindOf(saveChecked(s, "journal.json", mine, "v1"))) === "offline" && s.repo.loads === 0);
+    }
+    {
+      const s = fakeStorage({ todos: [], wishlist: [] }, "conflict-unchanged");
+      s.load = async () => { throw new StorageError("offline"); };
+      check("if the check itself can't reach GitHub the save is retried later, not called a conflict", (await kindOf(saveChecked(s, "journal.json", mine, "v1"))) === "offline");
+    }
+  } catch (e) {
+    failures.push(`FAIL test page crashed: ${e}`);
+  }
+
+  document.getElementById("out").textContent = failures.length ? failures.join("\n") : `All ${count} passed`;
+</script>

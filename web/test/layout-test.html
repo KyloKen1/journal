@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>layout tests (run in a 1920x1080 window)</title>
+<link rel="stylesheet" href="../style.css">
+<style>#out { position: fixed; right: 0; bottom: 0; margin: 0; z-index: 9; }</style>
+<body>
+<header class="topbar"><h1>Journal</h1></header>
+<main id="view" data-tab="todo"></main>
+<pre id="out">Running…</pre>
+<script type="module">
+  const failures = [];
+  let count = 0;
+  const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
+
+  try {
+    const { renderTodo } = await import("../todo.js");
+    const { nowISO } = await import("../format.js");
+    const view = document.getElementById("view");
+    const page = document.documentElement;
+    const words = Array.from({ length: 3000 }, () => "word").join(" ");
+    const state = {
+      todos: [{
+        id: "heavy", title: "A very long title ".repeat(20), description: words,
+        upNext: Array.from({ length: 40 }, (_, i) => ({ id: `s${i}`, text: `Step ${i}` })),
+        progress: Array.from({ length: 40 }, (_, i) => ({ id: `p${i}`, text: `Entry ${i}`, date: "2026-11-01" })),
+        completed: false, completedDate: null, created: nowISO(), updated: nowISO(),
+      }],
+      wishlist: [], suggestions: {},
+      todoSuggestions: { heavy: { checked: nowISO(), dismissed: [], suggestions: Array.from({ length: 2 }, (_, i) => ({ id: `g${i}`, text: "Suggestion ".repeat(30), steps: ["a", "b"] })) } },
+    };
+    renderTodo(view, state, () => {});
+
+    check("the test window is desktop sized", window.innerWidth >= 1200 && window.innerHeight >= 700);
+    check("the list can scroll like a normal page", getComputedStyle(document.body).overflowY !== "hidden");
+
+    view.querySelector(".todo-open").click();
+    const overflows = (sel) => { const e = view.querySelector(sel); return e.scrollHeight > e.clientHeight; };
+    const bottom = (sel) => view.querySelector(sel).getBoundingClientRect().bottom;
+    check("an open item with long content does not make the page scroll", page.scrollHeight <= window.innerHeight && page.scrollWidth <= window.innerWidth);
+    check("every section ends inside the window", [".desc-col", ".up-next", ".progress", ".suggest-col"].every((s) => bottom(s) <= window.innerHeight));
+    check("long sections scroll inside their own box", overflows(".description") && overflows(".up-next .steps") && overflows(".progress .done"));
+    check("a very long title stays on one line", view.querySelector(".item-head").getBoundingClientRect().height < 80);
+    check("the add boxes stay visible", bottom(".add-step") <= bottom(".up-next") && bottom(".add-progress") <= bottom(".progress"));
+
+    // Another tab is showing while an item is still open underneath (its mode marker remains).
+    view.dataset.tab = "wishlist";
+    view.replaceChildren(Object.assign(document.createElement("div"), { style: "height: 3000px" }));
+    check("another tab can still scroll after an item was open", getComputedStyle(document.body).overflowY !== "hidden" && page.scrollHeight > window.innerHeight);
+  } catch (e) {
+    failures.push(`FAIL test page crashed: ${e}`);
+  }
+
+  document.getElementById("view").replaceChildren();
+  document.getElementById("out").textContent = failures.length ? failures.join("\n") : `All ${count} passed`;
+</script>
+</body>
+</html>

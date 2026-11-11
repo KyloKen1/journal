@@ -59,6 +59,16 @@ export function createSaver({ save, onStatus, debounceMs = 3000, retryMs = 10000
     flush();
   }
 
+  // Phones freeze or close a page without warning, so don't sit on an edit once the page is hidden.
+  function flushNow() {
+    clearTimeout(timer);
+    flush();
+  }
+  window.addEventListener("pagehide", flushNow);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushNow();
+  });
+
   window.addEventListener("beforeunload", (e) => {
     if (pending || inFlight) e.preventDefault();
   });

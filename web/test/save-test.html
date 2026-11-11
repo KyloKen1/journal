@@ -72,6 +72,24 @@
       check("resume saves the pending edit", t.calls() === 2 && t.statuses.at(-1) === "saved" && t.saver.isIdle());
     }
     {
+      // Phones freeze or close a page without warning: save at once when it is hidden.
+      const t = make();
+      t.saver.changed();
+      window.dispatchEvent(new Event("pagehide"));
+      await wait(10);
+      check("leaving the page saves at once, without waiting for the pause", t.calls() === 1);
+      t.saver.changed();
+      Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+      await wait(10);
+      check("hiding the page saves at once", t.calls() === 2);
+      Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+      await wait(10);
+      check("showing the page again saves nothing extra", t.calls() === 2);
+      await wait(200);
+    }
+    {
       check("nothing prompts before leaving once all is saved", !leavePrompted());
       const t = make("conflict");
       t.saver.changed();

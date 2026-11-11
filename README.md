@@ -47,7 +47,7 @@ The first visit asks for a GitHub access token:
 3. Permissions: Repository permissions → Contents → Read and write.
 4. Generate the token, copy it, and paste it into the page.
 
-The token is kept in that browser only and sent only to GitHub. **Forget this device** in the top bar removes it. When a token expires, the page asks for a new one and keeps your unsaved edits.
+The token is kept in that browser only and sent only to GitHub. One limit: browser storage is shared by every site under `kyloken1.github.io`, so if you later publish another repo with GitHub Pages on this account, its pages could read the token. Give the token an expiry date, and consider a custom domain for the journal before publishing other Pages sites. **Forget this device** in the top bar removes it. When a token expires, the page asks for a new one and keeps your unsaved edits.
 
 ## Claude's suggestions
 

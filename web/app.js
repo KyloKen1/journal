@@ -1,5 +1,6 @@
 import { DATA_REPO, JOURNAL_PATH, SUGGESTIONS_PATH } from "./config.js";
 import { createStorage } from "./github.js";
+import { saveChecked } from "./journal-save.js";
 import { createSaver } from "./save.js";
 import { acceptedQueue, initSuggestions, loadSuggestions, todoAcceptedQueue } from "./suggest.js";
 import { createSuggestionStore } from "./suggest-store.js";
@@ -34,7 +35,7 @@ initSuggestions(createSuggestionStore({ storage, path: SUGGESTIONS_PATH }));
 
 const saver = createSaver({
   save: async () => {
-    state.sha = await storage.save(JOURNAL_PATH, { todos: state.todos, wishlist: state.wishlist }, state.sha);
+    state.sha = await saveChecked(storage, JOURNAL_PATH, { todos: state.todos, wishlist: state.wishlist }, state.sha);
   },
   onStatus(status, error) {
     statusEl.textContent = status === "saved" ? "Saved" : status === "saving" ? "Saving…" : "";
@@ -45,7 +46,7 @@ const saver = createSaver({
     } else if (status === "offline") {
       showAlert(OFFLINE);
     } else if (status === "error") {
-      showAlert(`Not saved — GitHub error ${error.status}. Retrying.`);
+      showAlert(`Not saved — GitHub error ${error.status ?? "unknown"}. Retrying.`);
     } else if (status === "conflict") {
       showAlert(CONFLICT);
       view.inert = true; // read-only, so nothing more can be typed and lost
@@ -86,6 +87,7 @@ function show(tab) {
   }
   if (!loaded) return; // never let edits happen on placeholder data
   view.replaceChildren();
+  delete view.dataset.mode; // the To-Do tab sets it again; other tabs must not inherit its layout
   view.dataset.tab = tab;
   tabs[tab](view, state, saver.changed);
 }

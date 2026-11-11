@@ -35,7 +35,7 @@ def run_page(browser: Path, url: str) -> str:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile:
         result = subprocess.run(
             [str(browser), "--headless", "--disable-gpu", "--no-first-run",
-             f"--user-data-dir={profile}", "--virtual-time-budget=20000", "--dump-dom", url],
+             f"--user-data-dir={profile}", "--window-size=1920,1080", "--virtual-time-budget=20000", "--dump-dom", url],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
         )
     match = re.search(r'<pre id="out">(.*?)</pre>', result.stdout, re.S)
