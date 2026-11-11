@@ -2,8 +2,8 @@
 ## Status
 **Phase:** Playable
 **Focus:** No
-**Summary:** Personal journal app for this PC: work issue cards and a ranked wishlist of things to buy, with Claude price suggestions on request.
-**Last updated:** 2026-11-05
+**Summary:** Personal to-do list and wishlist as a web page for PC and phone, with data in a private GitHub repo and Claude suggestions each weekday morning.
+**Last updated:** 2026-11-11
 
 ### Milestones
 - [x] Design spec approved
@@ -13,16 +13,20 @@
 - [x] Work tab usable
 - [x] Wishlist tab usable
 - [x] Price suggestions for wishlist items
+- [x] To-do list replaces the Work tab
+- [x] Page live on GitHub Pages with data in a private repo
+- [ ] Token set up and checked on PC and phone
 - [ ] Used day to day for a week
 
 ### Last session
-Added Claude price suggestions: on "update my wishlist" Claude asks what you want and your budget (saved in notes), then posts 2–3 SA shop options per item to Accept or Dismiss. First real run done on all 6 items; 39 tests pass.
+Turned the Work tab into a to-do list (completed archive, carry-over tags, one-screen item view with suggestions), moved the app to GitHub Pages with data in the private `journal-data` repo, and scheduled a weekday 08:00 suggestions check. Independent review done and its important findings fixed.
 
 ### Next steps
-1. Use the journal for a week and list changes (#6)
+1. Create the access token and check the live page on PC and phone (#12)
+2. Use the to-do list on PC and phone for a week and list changes (#14)
 
 ### Blockers
-None
+The page needs your GitHub access token on each device before it shows the list (#12).
 <!-- STATUS:END -->
 
 # Journal
