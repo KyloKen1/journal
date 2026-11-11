@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The page may only load its own files and talk to GitHub's API, so the access token can't leak elsewhere. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.github.com; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
   <title>Journal</title>
   <link rel="stylesheet" href="style.css">
   <script type="module" src="app.js"></script>
@@ -11,13 +14,15 @@
   <header class="topbar">
     <h1>Journal</h1>
     <nav class="tabs" role="tablist">
-      <button type="button" role="tab" data-tab="work" aria-selected="true">Work</button>
+      <button type="button" role="tab" data-tab="todo" aria-selected="true">To-Do</button>
       <button type="button" role="tab" data-tab="wishlist" aria-selected="false">Wishlist</button>
     </nav>
     <span id="status" class="status" aria-live="polite"></span>
+    <button type="button" id="forget" class="forget" hidden>Forget this device</button>
   </header>
   <div id="alert" class="alert" role="alert" hidden></div>
   <div id="notice" class="notice" role="status" hidden></div>
+  <div id="setup" hidden></div>
   <main id="view"></main>
 </body>
 </html>

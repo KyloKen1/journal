@@ -51,7 +51,7 @@ button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 button.danger { color: var(--danger); }
 
-input[type="text"], input[type="search"], textarea {
+input[type="text"], input[type="search"], input[type="password"], textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -77,6 +77,25 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .alert, .notice { padding: 8px 20px; font-weight: 600; }
 .alert { background: var(--danger-soft); color: var(--danger); }
 .notice { background: var(--warn-soft); }
+.forget { font-size: 13px; padding: 4px 10px; color: var(--muted); }
+
+/* Device setup (access token) */
+.setup {
+  max-width: 640px;
+  margin: 24px auto;
+  padding: 20px 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.setup h2 { margin: 0 0 8px; font-size: 18px; }
+.setup-message, .setup-problem { color: var(--danger); font-weight: 600; }
+.setup-steps { list-style: decimal; padding-left: 22px; margin: 12px 0 16px; }
+.setup-steps li { margin-bottom: 6px; }
+.setup a { color: var(--accent); }
+.setup-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.setup-row input { flex: 1 1 240px; }
+[inert] { opacity: 0.6; }
 
 main { padding: 20px; }
 

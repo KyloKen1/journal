@@ -92,7 +92,7 @@ export function renderWishlist(root, state, changed) {
     acceptOption(item, option);
     edit();
     delete state.suggestions[item.id];
-    acceptedQueue.add(item.id); // cleared on the server once this edit has saved
+    acceptedQueue.add(item.id); // cleared in the data repo once this edit has saved
     renderList();
   }
 

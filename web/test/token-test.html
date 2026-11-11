@@ -1,0 +1,53 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>token.js tests</title>
+<pre id="out">Running…</pre>
+<div id="root"></div>
+<script type="module">
+  const failures = [];
+  let count = 0;
+  const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
+  const KEY = "journal.githubToken";
+  const before = localStorage.getItem(KEY); // put back whatever this device had
+
+  try {
+    const { getToken, setToken, forgetToken, renderSetup } = await import("../token.js");
+
+    localStorage.removeItem(KEY);
+    check("no token to start with", getToken() === null);
+    check("setToken accepts a token", setToken("  abc\n") === true);
+    check("the token is stored trimmed", getToken() === "abc");
+    check("it is kept under the agreed key", localStorage.getItem(KEY) === "abc");
+    check("a blank token is refused", setToken("   ") === false);
+    check("a refused token leaves the old one", getToken() === "abc");
+    forgetToken();
+    check("forgetToken removes it", getToken() === null && localStorage.getItem(KEY) === null);
+
+    // Setup screen
+    const root = document.getElementById("root");
+    root.append("old content");
+    let saved = 0;
+    renderSetup(root, { message: "GitHub did not accept this device's token. Enter a new one.", onSaved: () => saved++ });
+    const input = root.querySelector("input");
+    const button = root.querySelector("button");
+    check("setup replaces what was there", !root.textContent.includes("old content"));
+    check("setup shows the message", root.textContent.includes("GitHub did not accept this device's token. Enter a new one."));
+    check("setup hides the token while typing", input?.type === "password");
+    check("setup links to GitHub's token page in a new tab",
+      [...root.querySelectorAll("a")].some((a) => a.href === "https://github.com/settings/personal-access-tokens/new" && a.target === "_blank" && a.rel.includes("noopener")));
+    check("setup names the repo and the permission", root.textContent.includes("journal-data") && root.textContent.includes("Read and write"));
+
+    input.value = "   ";
+    button.click();
+    check("saving a blank token does nothing", saved === 0 && getToken() === null);
+    input.value = " tok123 ";
+    button.click();
+    check("saving a token stores it and calls onSaved", saved === 1 && getToken() === "tok123");
+  } catch (e) {
+    failures.push(`FAIL test page crashed: ${e}`);
+  } finally {
+    if (before === null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, before);
+  }
+
+  document.getElementById("out").textContent = failures.length ? failures.join("\n") : `All ${count} passed`;
+</script>
