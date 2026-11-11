@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>To-Do demo (sample data, nothing is saved)</title>
+<link rel="stylesheet" href="../style.css">
+<body>
+<header class="topbar">
+  <h1>Journal</h1>
+  <nav class="tabs"><button type="button" aria-selected="true">To-Do</button></nav>
+  <span class="status" id="status">Demo — sample data, nothing is saved</span>
+</header>
+<main id="view" data-tab="todo"></main>
+<script type="module">
+  // The To-Do tab on made-up data, for checking the layout by eye. Nothing leaves this page.
+  import { initSuggestions } from "../suggest.js";
+  import { renderTodo } from "../todo.js";
+  import { nowISO } from "../format.js";
+
+  const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return nowISO(d); };
+  const todo = (id, title, age, extra = {}) => ({
+    id, title, description: "", upNext: [], progress: [], completed: false, completedDate: null,
+    created: daysAgo(age), updated: daysAgo(age), ...extra,
+  });
+  const words = Array.from({ length: 3000 }, (_, i) => (i % 17 === 16 ? "paragraph.\n\n" : "word")).join(" ");
+
+  const state = {
+    todos: [
+      todo("heavy", "Renew car licence", 3, {
+        description: words,
+        upNext: Array.from({ length: 40 }, (_, i) => ({ id: `s${i}`, text: `Up next step ${i + 1}` })),
+        progress: Array.from({ length: 40 }, (_, i) => ({ id: `p${i}`, text: `Progress entry ${40 - i}`, date: daysAgo(i).slice(0, 10) })),
+      }),
+      todo("long", "A very long title ".repeat(12).trim(), 9),
+      ...Array.from({ length: 9 }, (_, i) => todo(`t${i}`, `Ordinary item ${i + 1}`, i, i % 3 === 0 ? { upNext: [{ id: `n${i}`, text: "Phone the supplier" }] } : {})),
+      todo("blank", "", 0),
+      ...Array.from({ length: 5 }, (_, i) => todo(`c${i}`, `Finished item ${i + 1}`, 12, { completed: true, completedDate: daysAgo(i + 1).slice(0, 10) })),
+    ],
+    wishlist: [],
+    suggestions: {},
+    todoSuggestions: {
+      heavy: {
+        checked: nowISO(),
+        suggestions: [
+          { id: "g1", text: "Split this into two smaller steps", steps: ["Book the roadworthy test", "Pay the licence fee online"] },
+          { id: "g2", text: "No progress logged for 6 days. Is this still needed?", steps: [] },
+        ],
+        dismissed: [],
+      },
+      t3: { checked: nowISO(), suggestions: [{ id: "g3", text: "Add a first step", steps: ["Decide what done looks like"] }], dismissed: [] },
+      "deleted-item": { checked: nowISO(), suggestions: [{ id: "g4", text: "Orphan", steps: [] }], dismissed: [] },
+      broken: "not an entry",
+    },
+  };
+  window.demoState = state;
+  window.demoChanges = 0;
+
+  // A stand-in for the suggestions file that always saves.
+  initSuggestions({ load: async () => ({ items: {}, todos: {} }), update: async () => true });
+  renderTodo(document.getElementById("view"), state, () => { window.demoChanges++; });
+</script>
+</body>
+</html>

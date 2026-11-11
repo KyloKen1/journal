@@ -1,0 +1,172 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>todo.js tests</title>
+<pre id="out">Running…</pre>
+<main id="view" data-tab="todo"></main>
+<script type="module">
+  const failures = [];
+  let count = 0;
+  const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  try {
+    const { renderTodo } = await import("../todo.js");
+    const { initSuggestions, todoAcceptedQueue } = await import("../suggest.js");
+    const { nowISO, todayISO } = await import("../format.js");
+
+    const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return nowISO(d); };
+    const todo = (id, title, age, extra = {}) => ({
+      id, title, description: "", upNext: [], progress: [], completed: false, completedDate: null,
+      created: daysAgo(age), updated: daysAgo(age), ...extra,
+    });
+    const state = {
+      todos: [
+        todo("new", "Added today", 0),
+        todo("old", "Three days old", 3, { upNext: [{ id: "s1", text: "First step" }, { id: "s2", text: "Second step" }] }),
+        todo("done1", "Finished earlier", 9, { completed: true, completedDate: "2026-11-01" }),
+        todo("done2", "Finished later", 9, { completed: true, completedDate: "2026-11-05" }),
+      ],
+      wishlist: [],
+      suggestions: {},
+      todoSuggestions: {
+        old: {
+          checked: "2026-11-09T08:04:12",
+          suggestions: [
+            { id: "g1", text: "Split it", steps: ["Step A", "Step B"] },
+            { id: "g2", text: "Stalled for 6 days", steps: [] },
+          ],
+          dismissed: [],
+        },
+        done1: { checked: "2026-11-09T08:04:12", suggestions: [{ id: "g9", text: "x", steps: [] }] },
+        gone: { suggestions: [{ id: "g8", text: "orphan", steps: [] }] },
+        broken: "not an entry",
+      },
+    };
+    let changes = 0;
+    const dismissed = [];
+    let dismissOk = true;
+    initSuggestions({
+      load: async () => ({ items: {}, todos: {} }),
+      update: async (mutate) => { if (dismissOk) dismissed.push(mutate); return dismissOk; },
+    });
+
+    const view = document.getElementById("view");
+    const $ = (sel) => view.querySelector(sel);
+    const $$ = (sel) => [...view.querySelectorAll(sel)];
+    const type = (input, text) => { input.value = text; input.dispatchEvent(new Event("input", { bubbles: true })); };
+    const enter = (input) => input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    const openRows = () => $$(".todo-rows > .todo-row");
+    const doneRows = () => $$(".completed .todo-row");
+
+    renderTodo(view, state, () => changes++);
+
+    // List
+    check("open items are listed oldest first", openRows().map((r) => r.querySelector(".todo-title").textContent).join("|") === "Three days old|Added today");
+    check("an older item is tagged carried over", openRows()[0].querySelector(".todo-tag")?.textContent === "carried over · 3 days");
+    check("an item added today has no tag", !openRows()[1].querySelector(".todo-tag"));
+    check("a row shows the first up-next step", openRows()[0].textContent.includes("First step"));
+    check("a row shows a badge for waiting suggestions", openRows()[0].querySelector(".badge")?.textContent === "2 suggestions");
+    check("the completed archive is closed by default", $("details.completed") && !$("details.completed").open);
+    check("the archive counts completed items", $("details.completed summary").textContent === "Completed (2)");
+    check("completed items are newest first with their date", doneRows().map((r) => r.querySelector(".todo-title").textContent).join("|") === "Finished later|Finished earlier" && doneRows()[0].textContent.includes("2026-11-05"));
+    check("completed items show no suggestion badge", !doneRows().some((r) => r.querySelector(".badge")));
+
+    // Add
+    type($(".todo-add"), "   ");
+    enter($(".todo-add"));
+    check("a blank title adds nothing", state.todos.length === 4 && changes === 0);
+    type($(".todo-add"), "  Buy milk  ");
+    enter($(".todo-add"));
+    check("Enter adds a trimmed item", state.todos.length === 5 && state.todos.at(-1).title === "Buy milk" && changes === 1);
+    check("the new item appears in the list", openRows().length === 3 && openRows().at(-1).textContent.includes("Buy milk"));
+    check("the add box is cleared and keeps focus", $(".todo-add").value === "" && document.activeElement === $(".todo-add"));
+
+    // Tick / untick from the list
+    openRows().at(-1).querySelector("input[type=checkbox]").click();
+    const milk = state.todos.at(-1);
+    check("ticking a row completes it today", milk.completed === true && milk.completedDate === todayISO());
+    check("a ticked item moves to the archive", openRows().length === 2 && $("details.completed summary").textContent === "Completed (3)");
+    doneRows().find((r) => r.textContent.includes("Buy milk")).querySelector("input[type=checkbox]").click();
+    check("unticking in the archive reopens it", milk.completed === false && milk.completedDate === null && openRows().length === 3);
+
+    // Open an item
+    openRows()[0].querySelector(".todo-open").click();
+    const old = state.todos.find((t) => t.id === "old");
+    check("clicking a row opens the item view in place of the list", $(".item") && !$(".todo-add") && view.dataset.mode === "item");
+    check("the item view shows the title and tag", $(".item .title-input").value === "Three days old" && $(".item .todo-tag").textContent === "carried over · 3 days");
+    check("the item view has all four sections", ["Description", "Up next", "Progress", "Suggestions"].every((h) => $$(".item h3").some((e) => e.textContent === h)));
+
+    const before = changes;
+    type($(".item .title-input"), "Renamed");
+    type($(".item textarea.description"), "Some detail");
+    check("editing title and description updates the item and saves", old.title === "Renamed" && old.description === "Some detail" && changes === before + 2);
+    check("an edit stamps the item as updated now", old.updated.slice(0, 10) === todayISO());
+
+    // Up next and progress
+    type($(".item .add-step"), "Third step");
+    enter($(".item .add-step"));
+    check("a step can be added", old.upNext.length === 3 && $$(".up-next .steps li").length === 3);
+    $$(".up-next .steps li")[0].querySelector("input[type=checkbox]").click();
+    check("ticking a step moves it to progress with today's date", old.upNext.length === 2 && old.progress[0].text === "First step" && old.progress[0].date === todayISO());
+    check("the progress list shows it", $$(".progress .done li").length === 1 && $(".progress .done li").textContent.includes(todayISO()));
+    type($(".item .add-progress"), "Phoned them");
+    enter($(".item .add-progress"));
+    check("a progress entry can be added, newest first", old.progress.length === 2 && old.progress[0].text === "Phoned them");
+    $$(".up-next .steps li")[0].querySelector(".remove").click();
+    check("a step can be removed", old.upNext.length === 1 && old.upNext[0].text === "Third step");
+
+    // Suggestions
+    check("both suggestions are shown with the checked date", $$(".suggestion").length === 2 && $(".suggest-col").textContent.includes("Checked Mon 9 Nov"));
+    check("only a suggestion with steps offers Add to Up next", $$(".suggestion")[0].querySelector(".suggestion-add") && !$$(".suggestion")[1].querySelector(".suggestion-add"));
+    $$(".suggestion")[0].querySelector(".suggestion-add").click();
+    check("Add to Up next appends the steps", old.upNext.map((s) => s.text).join("|") === "Third step|Step A|Step B");
+    check("an accepted suggestion disappears and waits for the save", $$(".suggestion").length === 1 && todoAcceptedQueue.has("old/g1"));
+    dismissOk = false;
+    $(".suggestion .suggestion-dismiss").click();
+    await tick();
+    check("a dismiss that could not be saved keeps the suggestion", $$(".suggestion").length === 1);
+    dismissOk = true;
+    $(".suggestion .suggestion-dismiss").click();
+    await tick();
+    check("Dismiss removes the suggestion once saved", $$(".suggestion").length === 0 && dismissed.length === 1);
+    check("with none left the column says when Claude checks", $(".suggest-col").textContent.includes("No suggestions. Claude checks on weekday mornings."));
+
+    // Back, Esc, complete, delete
+    $(".item-back").click();
+    check("Back returns to the list", $(".todo-add") && !$(".item") && view.dataset.mode === "list");
+    check("the list shows the renamed item", openRows()[0].textContent.includes("Renamed"));
+    openRows()[0].querySelector(".todo-open").click();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    check("Esc returns to the list", $(".todo-add") && !$(".item"));
+    openRows()[0].querySelector(".todo-open").click();
+    $(".item .item-check").click();
+    check("ticking the item completes it and returns to the list", old.completed === true && $(".todo-add") && !$(".item"));
+
+    $("details.completed").open = true;
+    doneRows().find((r) => r.textContent.includes("Renamed")).querySelector(".todo-open").click();
+    check("a completed item can be opened", $(".item") && $(".item .item-check").checked === true);
+    $(".item .item-check").click();
+    check("unticking it there reopens it and stays in the item", old.completed === false && $(".item"));
+
+    const realConfirm = window.confirm;
+    window.confirm = () => false;
+    $(".item .item-delete").click();
+    check("Delete asks first and can be cancelled", state.todos.includes(old) && $(".item"));
+    window.confirm = () => true;
+    $(".item .item-delete").click();
+    window.confirm = realConfirm;
+    check("Delete removes the item and returns to the list", !state.todos.includes(old) && $(".todo-add"));
+
+    // Esc must not act when another tab is showing
+    openRows()[0].querySelector(".todo-open").click();
+    view.dataset.tab = "wishlist";
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    check("Esc does nothing while another tab is showing", Boolean($(".item")));
+    view.dataset.tab = "todo";
+  } catch (e) {
+    failures.push(`FAIL test page crashed: ${e}${e?.stack ? `\n${e.stack}` : ""}`);
+  }
+
+  document.getElementById("view").hidden = true;
+  document.getElementById("out").textContent = failures.length ? failures.join("\n") : `All ${count} passed`;
+</script>
