@@ -2,7 +2,7 @@
 ## Status
 **Phase:** Playable
 **Focus:** No
-**Summary:** Personal to-do list and wishlist as a web page for PC and phone, with data in a private GitHub repo and Claude suggestions each weekday morning.
+**Summary:** Personal to-do list, wishlist and private book notes as a web page for PC and phone, with data in a private GitHub repo and Claude suggestions on to-dos each weekday morning.
 **Last updated:** 2026-11-11
 
 ### Milestones
@@ -15,15 +15,18 @@
 - [x] Price suggestions for wishlist items
 - [x] To-do list replaces the Work tab
 - [x] Page live on GitHub Pages with data in a private repo
+- [x] Tests run before every publish
+- [x] Books tab for books read
 - [ ] Token set up and checked on PC and phone
 - [ ] Used day to day for a week
 
 ### Last session
-Turned the Work tab into a to-do list (completed archive, carry-over tags, one-screen item view with suggestions), moved the app to GitHub Pages with data in the private `journal-data` repo, and scheduled a weekday 08:00 suggestions check. Independent review done and its important findings fixed.
+Reviewed the whole project and fixed three findings (tests now run before publishing, a missing data file is no longer reported as a bad token, a background refresh can't roll the page back). Added a Books tab (title, author, finished date, liked, disliked) saved to its own `books.json` that Claude's tools refuse to open.
 
 ### Next steps
-1. Create the access token and check the live page on PC and phone (#12)
+1. Create the access token and check the live page, including the Books tab, on PC and phone (#12)
 2. Use the to-do list on PC and phone for a week and list changes (#14)
+3. Check wishlist dragging on the phone; add buttons if it doesn't work (#21)
 
 ### Blockers
 The page needs your GitHub access token on each device before it shows the list (#12).
