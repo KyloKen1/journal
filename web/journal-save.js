@@ -6,6 +6,27 @@
 //  - GitHub was busy with another write to the repo and nothing actually changed.
 // Stopping the page for those would throw away the owner's latest edits for nothing.
 
+// Several files behind one autosaver: remembers which have unsaved edits and saves only those.
+// files is { name: { path, data(), getSha(), setSha(sha) } }.
+export function createDirtySave(storage, files) {
+  const dirty = new Set();
+  return {
+    mark: (name) => dirty.add(name),
+    async save() {
+      for (const name of [...dirty]) {
+        const file = files[name];
+        dirty.delete(name); // an edit made while this save is in flight marks it again
+        try {
+          file.setSha(await saveChecked(storage, file.path, file.data(), file.getSha()));
+        } catch (error) {
+          dirty.add(name);
+          throw error;
+        }
+      }
+    },
+  };
+}
+
 export async function saveChecked(storage, path, data, sha) {
   try {
     return await storage.save(path, data, sha);

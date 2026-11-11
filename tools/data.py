@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Callable
 
 REPO = "KyloKen1/journal-data"
+FILES = ("journal.json", "suggestions.json")  # the only files Claude may read or write
 MAX_OPTIONS = 3  # buy options per wishlist item
 MAX_SUGGESTIONS = 2  # suggestions per to-do item
 
@@ -40,6 +41,9 @@ def gh_api(args: list[str], stdin: str | None = None) -> tuple[int, str, str]:
 
 def get(path: str, run: Run = gh_api) -> tuple[str, str]:
     """The file's text and its sha."""
+    if path not in FILES:
+        # Everything else in the data repo (books.json, for one) is the owner's private notes.
+        raise ValueError(f"{path!r} is not Claude's to read: use journal.json or suggestions.json")
     code, out, err = run([f"repos/{REPO}/contents/{path}"], None)
     if code != 0:
         raise ToolError(err.strip() or f"gh exited with {code}")

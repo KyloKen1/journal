@@ -1,0 +1,96 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>app start-up and Books saving tests</title>
+<pre id="out">Running…</pre>
+<!-- The same elements index.html gives app.js. -->
+<header>
+  <nav>
+    <button type="button" data-tab="todo">To-Do</button>
+    <button type="button" data-tab="wishlist">Wishlist</button>
+    <button type="button" data-tab="books">Books</button>
+  </nav>
+  <span id="status"></span>
+  <button type="button" id="forget" hidden></button>
+</header>
+<div id="alert" hidden></div>
+<div id="notice" hidden></div>
+<div id="setup" hidden></div>
+<main id="view"></main>
+<script type="module">
+  const failures = [];
+  let count = 0;
+  const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
+  const until = async (test, ms = 3000) => {
+    for (const end = Date.now() + ms; Date.now() < end;) {
+      if (test()) return true;
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    return false;
+  };
+
+  const TOKEN_KEY = "journal.githubToken";
+  try {
+    // A fake GitHub holding journal.json and suggestions.json but no books.json yet.
+    const toBase64 = (text) => btoa(String.fromCharCode(...new TextEncoder().encode(text)));
+    const fromBase64 = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+    const repo = {
+      "journal.json": { sha: "j1", text: JSON.stringify({ todos: [{ id: "t1", title: "Existing to-do", description: "", upNext: [], progress: [], completed: false, completedDate: null, created: "2026-11-11T08:00:00", updated: "2026-11-11T08:00:00" }], wishlist: [] }) },
+      "suggestions.json": { sha: "s1", text: JSON.stringify({ items: {}, todos: {} }) },
+    };
+    const puts = [];
+    const json = (status, body) => new Response(JSON.stringify(body), { status });
+    window.fetch = async (url, init = {}) => {
+      if (url === "https://api.github.com/repos/KyloKen1/journal-data") return json(200, { name: "journal-data" });
+      const path = url.split("/contents/")[1];
+      if (init.method === "PUT") {
+        const body = JSON.parse(init.body);
+        puts.push({ path, sha: body.sha, data: JSON.parse(fromBase64(body.content)) });
+        repo[path] = { sha: `${path}-v${puts.length}`, text: fromBase64(body.content) };
+        return json(200, { content: { sha: repo[path].sha } });
+      }
+      const file = repo[path];
+      return file ? json(200, { sha: file.sha, encoding: "base64", content: toBase64(file.text) }) : json(404, {});
+    };
+    localStorage.setItem(TOKEN_KEY, "test-token");
+
+    await import("../app.js");
+    const view = document.getElementById("view");
+    const status = document.getElementById("status");
+    const type = (input, text) => { input.value = text; input.dispatchEvent(new Event("input", { bubbles: true })); };
+    const hidePage = () => window.dispatchEvent(new Event("pagehide")); // makes the autosaver save at once
+
+    check("the list loads although books.json does not exist yet", await until(() => view.textContent.includes("Existing to-do")));
+    check("no setup screen or error is shown", document.getElementById("setup").hidden && document.getElementById("alert").hidden && document.getElementById("notice").hidden);
+
+    document.querySelector('[data-tab="books"]').click();
+    check("the Books tab opens empty", /No books yet/.test(view.textContent) && document.querySelector('[data-tab="books"]').getAttribute("aria-selected") === "true");
+
+    view.querySelector(".book-add").click();
+    type(view.querySelector(".book-title-input"), "Dune");
+    type(view.querySelector(".book-liked"), "The world");
+    hidePage();
+    check("the book is saved", await until(() => puts.length === 1 && status.textContent === "Saved"));
+    check("it is saved to books.json, created without a version", puts[0]?.path === "books.json" && puts[0]?.sha === undefined);
+    check("the saved file holds the book and its notes", puts[0]?.data.books.length === 1 && puts[0].data.books[0].title === "Dune" && puts[0].data.books[0].liked === "The world");
+    check("journal.json is not rewritten by a book edit", puts.every((p) => p.path !== "journal.json"));
+
+    type(view.querySelector(".book-disliked"), "Slow middle");
+    hidePage();
+    check("a second edit saves on top of the first version", await until(() => puts.length === 2) && puts[1].path === "books.json" && puts[1].sha === "books.json-v1" && puts[1].data.books[0].disliked === "Slow middle");
+
+    document.querySelector('[data-tab="todo"]').click();
+    type(view.querySelector(".todo-add"), "New to-do");
+    view.querySelector(".todo-add").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    hidePage();
+    check("a to-do edit saves journal.json only, without the books", await until(() => puts.length === 3) && puts[2].path === "journal.json" && puts[2].sha === "j1" && !("books" in puts[2].data) && puts[2].data.todos.length === 2);
+
+    document.querySelector('[data-tab="books"]').click();
+    check("the book is still there after switching tabs", view.querySelector(".book-title")?.textContent === "Dune");
+  } catch (e) {
+    failures.push(`FAIL test page crashed: ${e}`);
+  }
+
+  localStorage.removeItem(TOKEN_KEY);
+  document.getElementById("view").replaceChildren();
+  document.getElementById("out").textContent = failures.length ? failures.join("\n") : `All ${count} passed`;
+</script>

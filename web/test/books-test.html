@@ -1,0 +1,147 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>books tests</title>
+<pre id="out">Running…</pre>
+<main id="view" data-tab="books"></main>
+<script type="module">
+  const failures = [];
+  let count = 0;
+  const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
+
+  try {
+    const { normalizeBooks, newBook, sortedBooks } = await import("../books-model.js");
+    const { renderBooks } = await import("../books.js");
+    const { createDirtySave } = await import("../journal-save.js");
+    const { todayISO } = await import("../format.js");
+    const { BOOKS_PATH } = await import("../config.js");
+
+    check("books are kept in their own file", BOOKS_PATH === "books.json");
+
+    // ---- model ----
+    const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+    check("a file without a books list is refused", throws(() => normalizeBooks({})) && throws(() => normalizeBooks(null)) && throws(() => normalizeBooks({ books: "x" })) && throws(() => normalizeBooks([])));
+    {
+      const full = { id: "b1", title: "Dune", author: "Frank Herbert", finished: "2026-10-02", liked: "The world", disliked: "The pacing" };
+      check("a complete book is kept as it is", JSON.stringify(normalizeBooks({ books: [full] })) === JSON.stringify([full]));
+      const repaired = normalizeBooks({ books: [{ title: "Only a title", finished: "last week", liked: 5 }, "junk", null] });
+      check("a hand-edited book with missing fields is repaired",
+        repaired.length === 1 && repaired[0].title === "Only a title" && repaired[0].author === "" && repaired[0].finished === "" &&
+        repaired[0].liked === "" && repaired[0].disliked === "" && typeof repaired[0].id === "string" && repaired[0].id.length > 0);
+    }
+    {
+      const book = newBook("2026-11-11");
+      check("a new book is blank and finished today",
+        book.title === "" && book.author === "" && book.liked === "" && book.disliked === "" && book.finished === "2026-11-11" && book.id.length > 0);
+      check("new books get different ids", newBook("2026-11-11").id !== book.id);
+    }
+    {
+      const b = (id, finished) => ({ id, title: id, author: "", finished, liked: "", disliked: "" });
+      const books = [b("old", "2025-01-05"), b("undated", ""), b("new", "2026-11-01"), b("same-a", "2026-03-03"), b("same-b", "2026-03-03")];
+      const order = sortedBooks(books).map((x) => x.id).join(",");
+      check("books sort newest finished first, undated last, later-added first among equals", order === "new,same-b,same-a,old,undated");
+      check("sorting leaves the saved order alone", books[0].id === "old");
+    }
+
+    // ---- saving only the file that changed ----
+    {
+      const saves = [];
+      const shas = { journal: "j1", books: null };
+      const storage = {
+        async load() { throw new Error("not expected"); },
+        async save(path, data, sha) {
+          saves.push({ path, data: structuredClone(data), sha });
+          if (failNext) { failNext = false; throw Object.assign(new Error("x"), { kind: "offline" }); }
+          return `${path}-v${saves.length}`;
+        },
+      };
+      let failNext = false;
+      const bookList = [];
+      const files = createDirtySave(storage, {
+        journal: { path: "journal.json", data: () => ({ todos: [], wishlist: [] }), getSha: () => shas.journal, setSha: (s) => { shas.journal = s; } },
+        books: { path: "books.json", data: () => ({ books: bookList }), getSha: () => shas.books, setSha: (s) => { shas.books = s; } },
+      });
+      await files.save();
+      check("nothing is saved when nothing changed", saves.length === 0);
+
+      bookList.push({ id: "b1" });
+      files.mark("books");
+      await files.save();
+      check("a book edit saves only books.json", saves.length === 1 && saves[0].path === "books.json" && saves[0].data.books.length === 1);
+      check("the first save of books.json quotes no version, so the file is created", saves[0].sha === null);
+      check("the books version is remembered and the journal's is untouched", shas.books === "books.json-v1" && shas.journal === "j1");
+
+      files.mark("journal");
+      await files.save();
+      check("a to-do edit saves only journal.json", saves.length === 2 && saves[1].path === "journal.json" && saves[1].sha === "j1");
+
+      failNext = true;
+      files.mark("books");
+      let kind = null;
+      try { await files.save(); } catch (e) { kind = e.kind; }
+      await files.save();
+      check("a failed save is reported and retried next time", kind === "offline" && saves.length === 4 && saves[3].path === "books.json" && saves[3].sha === "books.json-v1");
+      await files.save();
+      check("a saved file is not sent again", saves.length === 4);
+    }
+
+    // ---- the tab ----
+    const view = document.getElementById("view");
+    const $ = (sel) => view.querySelector(sel);
+    const $$ = (sel) => [...view.querySelectorAll(sel)];
+    const type = (input, text) => { input.value = text; input.dispatchEvent(new Event("input", { bubbles: true })); };
+    const state = {
+      books: [
+        { id: "b1", title: "Dune", author: "Frank Herbert", finished: "2026-10-02", liked: "The world", disliked: "The pacing" },
+        { id: "b2", title: "Project Hail Mary", author: "Andy Weir", finished: "2026-11-01", liked: "", disliked: "" },
+      ],
+    };
+    let changes = 0;
+    renderBooks(view, state, () => { changes++; });
+
+    const titles = () => $$(".book-title").map((e) => e.textContent).join("|");
+    check("the list shows books newest first", titles() === "Project Hail Mary|Dune");
+    check("a row shows the author and the finished date", $(".book-author").textContent === "Andy Weir" && $(".book-date").textContent === "Sun 1 Nov 2026");
+    check("the count is shown", $(".book-count").textContent === "2 books");
+    check("no editor is open to begin with", !$(".book-editor"));
+    check("nothing on the tab mentions Claude or suggestions", !/claude|suggest/i.test(view.textContent) && !$(".badge"));
+
+    $$(".book-row")[1].click();
+    check("clicking a book opens its notes", $(".book-liked").value === "The world" && $(".book-disliked").value === "The pacing" && $(".book-title-input").value === "Dune");
+    type($(".book-liked"), "The world, the politics");
+    type($(".book-disliked"), "Slow middle");
+    check("typing in Liked and Disliked updates the book and asks for a save",
+      state.books[0].liked === "The world, the politics" && state.books[0].disliked === "Slow middle" && changes === 2);
+    type($(".book-title-input"), "Dune (reread)");
+    check("a title edit shows in the row straight away", titles() === "Project Hail Mary|Dune (reread)" && state.books[0].title === "Dune (reread)");
+    type($(".book-finished-input"), "2026-11-10");
+    check("the finished date can be changed", state.books[0].finished === "2026-11-10");
+    $(".book-done").click();
+    check("Done closes the editor and re-sorts the list", !$(".book-editor") && titles() === "Dune (reread)|Project Hail Mary");
+
+    changes = 0;
+    $(".book-add").click();
+    check("Add book makes a blank book finished today, opens it and asks for a save",
+      state.books.length === 3 && state.books[2].title === "" && state.books[2].finished === todayISO() && changes === 1 &&
+      $(".book-title-input").value === "" && document.activeElement === $(".book-title-input"));
+    check("an untitled book reads Untitled in the list", $(".book.open .book-title").textContent === "Untitled");
+
+    const realConfirm = window.confirm;
+    window.confirm = () => false;
+    $(".book-delete").click();
+    check("Delete does nothing unless confirmed", state.books.length === 3);
+    window.confirm = () => true;
+    $(".book-delete").click();
+    window.confirm = realConfirm;
+    check("a confirmed Delete removes the book and asks for a save", state.books.length === 2 && changes === 2 && !$(".book-editor") && $(".book-count").textContent === "2 books");
+
+    state.books.length = 0;
+    view.replaceChildren();
+    renderBooks(view, state, () => {});
+    check("an empty list says so", /No books yet/.test(view.textContent) && $(".book-count").textContent === "0 books");
+  } catch (e) {
+    failures.push(`FAIL test page crashed: ${e}`);
+  }
+
+  document.getElementById("view").replaceChildren();
+  document.getElementById("out").textContent = failures.length ? failures.join("\n") : `All ${count} passed`;
+</script>

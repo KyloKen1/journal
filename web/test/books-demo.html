@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Books demo (sample data, nothing is saved)</title>
+<link rel="stylesheet" href="../style.css">
+<body>
+<header class="topbar">
+  <h1>Journal</h1>
+  <nav class="tabs"><button type="button" aria-selected="true">Books</button></nav>
+  <span class="status">Demo — sample data, nothing is saved</span>
+</header>
+<main id="view" data-tab="books"></main>
+<script type="module">
+  // The Books tab on made-up data, for checking the layout by eye. Nothing leaves this page.
+  import { renderBooks } from "../books.js";
+
+  const state = {
+    books: [
+      { id: "b1", title: "Dune", author: "Frank Herbert", finished: "2026-10-02", liked: "The world-building and the politics.\nThe ecology of Arrakis.", disliked: "Slow middle section." },
+      { id: "b2", title: "Project Hail Mary", author: "Andy Weir", finished: "2026-11-01", liked: "Rocky.", disliked: "" },
+      { id: "b3", title: "A very long book title that goes on and on ".repeat(4).trim(), author: "An Author With A Long Name", finished: "2025-06-15", liked: "", disliked: "" },
+      { id: "b4", title: "", author: "", finished: "", liked: "", disliked: "" },
+    ],
+  };
+  window.demoState = state;
+  renderBooks(document.getElementById("view"), state, () => {});
+</script>
+</body>
+</html>

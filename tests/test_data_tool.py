@@ -58,6 +58,24 @@ class GetTests(unittest.TestCase):
         self.assertIn("404", str(caught.exception))
 
 
+class PrivateFileTests(unittest.TestCase):
+    def test_get_refuses_any_other_file_without_calling_gh(self):
+        for path in ("books.json", "notes.txt", "../journal.json"):
+            gh = FakeGh()
+            with self.assertRaises(ValueError):
+                data.get(path, run=gh)
+            self.assertEqual(gh.calls, [])
+
+    def test_put_refuses_books_without_calling_gh(self):
+        gh = FakeGh()
+        with self.assertRaises(ValueError):
+            data.put("books.json", json.dumps({"books": []}), "abc", run=gh)
+        self.assertEqual(gh.calls, [])
+
+    def test_command_line_get_of_books_exits_2(self):
+        self.assertEqual(data.main(["get", "books.json", "unused.json"]), 2)
+
+
 class PutTests(unittest.TestCase):
     def test_put_uploads_base64_with_the_sha(self):
         text = json.dumps({"todos": [], "wishlist": [{"name": "Café ☕"}]}, ensure_ascii=False)

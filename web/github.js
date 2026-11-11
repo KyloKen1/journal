@@ -85,7 +85,8 @@ export function createStorage({ repo, getToken, fetch = globalThis.fetch }) {
   }
 
   function save(path, data, sha) {
-    const body = JSON.stringify({ message: `Update ${path}`, content: encode(JSON.stringify(data, null, 2)), sha });
+    // No sha means the file does not exist yet: leaving it out makes GitHub create the file.
+    const body = JSON.stringify({ message: `Update ${path}`, content: encode(JSON.stringify(data, null, 2)), ...(sha ? { sha } : {}) });
     const send = async () => {
       // keepalive lets a save that starts as the page is hidden or closed still finish.
       const result = await request(path, { method: "PUT", body, keepalive: body.length < KEEPALIVE_LIMIT });

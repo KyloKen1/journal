@@ -35,6 +35,7 @@ A personal to-do list and wishlist that runs in the browser, on any device.
 
 - **To-Do:** one running list. Tick an item to move it to the Completed archive; anything unfinished is still there tomorrow, tagged "carried over". Open an item to see its description, up next steps, a dated progress log and Claude's suggestions on one screen.
 - **Wishlist:** things to buy, ranked by dragging, with prices in rand.
+- **Books:** the books you have read, each with what you liked and what you disliked. These notes are private: they are kept in their own file (`books.json`) that Claude's skills and tools never open.
 
 ## Use it
 
