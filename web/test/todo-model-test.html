@@ -1,0 +1,154 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>todo-model.js tests</title>
+<pre id="out">Running…</pre>
+<script type="module">
+  const out = document.getElementById("out");
+  const failures = [];
+  let count = 0;
+  const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+
+  try {
+    const m = await import("../todo-model.js");
+
+    const issue = () => ({
+      id: "a", title: "T", details: "D",
+      nextSteps: [{ id: "s", text: "x" }],
+      done: [{ id: "d", text: "y", date: "2026-11-03" }],
+      archived: false, created: "2026-11-03T10:00:00", updated: "2026-11-04T12:30:00",
+    });
+
+    // convertIssue
+    {
+      const t = m.convertIssue(issue());
+      check("convert keeps id, title and dates", t.id === "a" && t.title === "T" && t.created === "2026-11-03T10:00:00" && t.updated === "2026-11-04T12:30:00");
+      check("convert maps details to description", t.description === "D" && !("details" in t));
+      check("convert maps next steps to upNext", same(t.upNext, [{ id: "s", text: "x" }]) && !("nextSteps" in t));
+      check("convert maps done to progress", same(t.progress, [{ id: "d", text: "y", date: "2026-11-03" }]) && !("done" in t));
+      check("convert of an open card is not completed", t.completed === false && t.completedDate === null && !("archived" in t));
+      const archived = m.convertIssue({ ...issue(), archived: true });
+      check("convert of an archived card is completed on its updated date", archived.completed === true && archived.completedDate === "2026-11-04");
+    }
+
+    // normalizeJournal
+    {
+      const w = { id: "w", name: "Keyboard" };
+      const n = m.normalizeJournal({ version: 7, issues: [issue()], wishlist: [w] });
+      check("old shape converts issues to todos", n.todos.length === 1 && n.todos[0].description === "D");
+      check("old shape keeps the wishlist", same(n.wishlist, [w]));
+      check("old shape drops version and issues", same(Object.keys(n).sort(), ["todos", "wishlist"]));
+      const current = { todos: [{ id: "t" }], wishlist: [] };
+      check("current shape passes through", same(m.normalizeJournal(current), current));
+      check("null journal throws", throws(() => m.normalizeJournal(null)));
+      check("empty object journal throws", throws(() => m.normalizeJournal({})));
+      check("non-list todos throws", throws(() => m.normalizeJournal({ todos: "x", wishlist: [] })));
+      check("missing wishlist throws", throws(() => m.normalizeJournal({ todos: [] })));
+    }
+
+    // normalizeSuggestions
+    {
+      check("suggestions without todos get an empty todos map", same(m.normalizeSuggestions({ items: { a: 1 } }), { items: { a: 1 }, todos: {} }));
+      check("null suggestions become empty", same(m.normalizeSuggestions(null), { items: {}, todos: {} }));
+      check("non-object sections become empty", same(m.normalizeSuggestions({ items: [], todos: "x" }), { items: {}, todos: {} }));
+    }
+
+    // newTodo
+    {
+      const t = m.newTodo("Buy milk", "2026-11-11T08:00:00");
+      check("newTodo has the title and empty sections", t.title === "Buy milk" && t.description === "" && same(t.upNext, []) && same(t.progress, []));
+      check("newTodo is open", t.completed === false && t.completedDate === null);
+      check("newTodo is stamped with now", t.created === "2026-11-11T08:00:00" && t.updated === "2026-11-11T08:00:00" && typeof t.id === "string" && t.id.length > 0);
+    }
+
+    // carriedOverDays
+    {
+      const days = (created, today) => m.carriedOverDays({ created }, today);
+      check("added today is 0 days", days("2026-11-11T08:00:00", "2026-11-11") === 0);
+      check("added 23:59 yesterday is 1 day", days("2026-11-10T23:59:00", "2026-11-11") === 1);
+      check("days count across a month end", days("2026-10-30T09:00:00", "2026-11-02") === 3);
+      check("an item dated tomorrow is 0 days", days("2026-11-12T09:00:00", "2026-11-11") === 0);
+    }
+
+    // ordering
+    {
+      const todos = [
+        { id: "b", completed: false, created: "2026-11-10T09:00:00" },
+        { id: "x", completed: true, completedDate: "2026-11-05" },
+        { id: "a", completed: false, created: "2026-11-01T09:00:00" },
+        { id: "z", completed: true, completedDate: "2026-11-09" },
+        { id: "c", completed: false, created: "2026-11-11T09:00:00" },
+        { id: "y", completed: true, completedDate: "2026-11-07" },
+      ];
+      check("open todos are oldest first", same(m.openTodos(todos).map((t) => t.id), ["a", "b", "c"]));
+      check("completed todos are newest first", same(m.completedTodos(todos).map((t) => t.id), ["z", "y", "x"]));
+    }
+
+    // complete / reopen
+    {
+      const t = m.newTodo("x", "2026-11-11T08:00:00");
+      m.completeTodo(t, "2026-11-12");
+      check("completeTodo sets completed and the date", t.completed === true && t.completedDate === "2026-11-12");
+      m.reopenTodo(t);
+      check("reopenTodo clears completed and the date", t.completed === false && t.completedDate === null);
+    }
+
+    // completeStep
+    {
+      const t = m.newTodo("x", "2026-11-11T08:00:00");
+      t.upNext = [{ id: "s1", text: "one" }, { id: "s2", text: "two" }];
+      t.progress = [{ id: "p", text: "old", date: "2026-11-01" }];
+      m.completeStep(t, t.upNext[1], "2026-11-11");
+      check("completeStep removes the step from upNext", same(t.upNext, [{ id: "s1", text: "one" }]));
+      check("completeStep puts it first in progress with today's date", same(t.progress[0], { id: "s2", text: "two", date: "2026-11-11" }) && t.progress.length === 2);
+    }
+
+    // applySuggestion
+    {
+      const t = m.newTodo("x", "2026-11-11T08:00:00");
+      t.upNext = [{ id: "s1", text: "one" }];
+      const entry = { checked: "2026-11-11T08:00:00", suggestions: [{ id: "g1", text: "Split", steps: ["a", "b"] }, { id: "g2", text: "Stalled", steps: [] }], dismissed: [] };
+      check("applySuggestion with an unknown id returns false", m.applySuggestion(t, entry, "nope") === false && t.upNext.length === 1 && entry.suggestions.length === 2);
+      check("applySuggestion with no entry returns false", m.applySuggestion(t, undefined, "g1") === false);
+      const ok = m.applySuggestion(t, entry, "g1");
+      check("applySuggestion appends the steps", ok === true && same(t.upNext.map((s) => s.text), ["one", "a", "b"]));
+      check("applied steps get fresh ids", new Set(t.upNext.map((s) => s.id)).size === 3);
+      check("applySuggestion removes the suggestion", same(entry.suggestions.map((s) => s.id), ["g2"]));
+    }
+
+    // removeSuggestion / dismissSuggestion
+    {
+      const entry = { suggestions: [{ id: "g1", text: "A", steps: [] }], dismissed: [] };
+      m.removeSuggestion(entry, "g1");
+      check("removeSuggestion removes without recording", entry.suggestions.length === 0 && entry.dismissed.length === 0);
+      let threw = false;
+      try { m.removeSuggestion(undefined, "g1"); m.dismissSuggestion(undefined, "g1"); m.dismissSuggestion(entry, "gone"); } catch { threw = true; }
+      check("remove and dismiss tolerate a missing entry or suggestion", !threw);
+
+      const many = { suggestions: [], dismissed: [] };
+      for (let i = 1; i <= 12; i++) {
+        many.suggestions.push({ id: `g${i}`, text: `text ${i}`, steps: [] });
+        m.dismissSuggestion(many, `g${i}`);
+      }
+      check("dismissSuggestion removes the suggestion", many.suggestions.length === 0);
+      check("dismissed keeps only the last 10 texts", many.dismissed.length === 10 && many.dismissed[0] === "text 3" && many.dismissed[9] === "text 12");
+      const bare = { suggestions: [{ id: "g", text: "B", steps: [] }] };
+      m.dismissSuggestion(bare, "g");
+      check("dismissSuggestion creates the dismissed list when missing", same(bare.dismissed, ["B"]));
+    }
+
+    // pendingSuggestions
+    {
+      const map = { t1: { suggestions: [{ id: "g", text: "A", steps: [] }] }, t3: {} };
+      check("pending suggestions for an open todo", m.pendingSuggestions({ id: "t1", completed: false }, map).length === 1);
+      check("no pending suggestions for a completed todo", same(m.pendingSuggestions({ id: "t1", completed: true }, map), []));
+      check("no pending suggestions without an entry", same(m.pendingSuggestions({ id: "t2", completed: false }, map), []));
+      check("no pending suggestions for a malformed entry", same(m.pendingSuggestions({ id: "t3", completed: false }, map), []));
+    }
+  } catch (e) {
+    failures.push(`FAIL test page crashed: ${e}`);
+  }
+
+  out.textContent = failures.length ? failures.join("\n") : `All ${count} passed`;
+</script>
