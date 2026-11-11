@@ -21,7 +21,7 @@
 - [ ] Used day to day for a week
 
 ### Last session
-Reviewed the whole project and fixed three findings (tests now run before publishing, a missing data file is no longer reported as a bad token, a background refresh can't roll the page back). Added a Books tab (title, author, finished date, liked, disliked) saved to its own `books.json` that Claude's tools refuse to open.
+Reviewed the whole project and fixed three findings (tests now run before publishing, a missing data file is no longer reported as a bad token, a background refresh can't roll the page back). Added a Books tab (title, author, percentage read with a progress bar, finished date, liked, disliked) saved to its own `books.json` that Claude's tools refuse to open.
 
 ### Next steps
 1. Create the access token and check the live page, including the Books tab, on PC and phone (#12)
@@ -38,7 +38,7 @@ A personal to-do list and wishlist that runs in the browser, on any device.
 
 - **To-Do:** one running list. Tick an item to move it to the Completed archive; anything unfinished is still there tomorrow, tagged "carried over". Open an item to see its description, up next steps, a dated progress log and Claude's suggestions on one screen.
 - **Wishlist:** things to buy, ranked by dragging, with prices in rand.
-- **Books:** the books you have read, each with what you liked and what you disliked. These notes are private: they are kept in their own file (`books.json`) that Claude's skills and tools never open.
+- **Books:** the books you are reading or have read, each with a bar showing how far through you are, and what you liked and what you disliked. These notes are private: they are kept in their own file (`books.json`) that Claude's skills and tools never open.
 
 ## Use it
 

@@ -51,7 +51,7 @@ button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 button.danger { color: var(--danger); }
 
-input[type="text"], input[type="search"], input[type="password"], input[type="date"], textarea {
+input[type="text"], input[type="search"], input[type="password"], input[type="date"], input[type="number"], textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -192,7 +192,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
   .scroll { overflow-y: visible; }
   .todo-open { flex-wrap: wrap; row-gap: 2px; min-height: 44px; }
   .todo-next { flex-basis: 100%; }
-  button, input[type="text"], input[type="password"], input[type="date"] { min-height: 44px; }
+  button, input[type="text"], input[type="password"], input[type="date"], input[type="number"] { min-height: 44px; }
   .todo-row input[type="checkbox"], .item-check, .steps input[type="checkbox"] { width: 24px; height: 24px; }
 }
 
@@ -295,7 +295,27 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
 }
 .book-title { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .book-author { flex: 1 1 0; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.book-date { flex: none; margin-left: auto; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* How far through the book: a small bar and the number beside it. */
+.book-bar {
+  flex: none;
+  align-self: center;
+  width: 72px;
+  height: 6px;
+  border: none;
+  border-radius: 999px;
+  overflow: hidden;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--line);
+}
+.book-bar::-webkit-progress-bar { background: var(--line); }
+.book-bar::-webkit-progress-value { background: var(--accent); }
+.book-bar::-moz-progress-bar { background: var(--accent); }
+.book-percent { flex: none; width: 3em; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; }
+.book-percent-row { display: flex; align-items: center; gap: 10px; color: var(--text); }
+.book-percent-slider { flex: 1; min-width: 0; accent-color: var(--accent); }
+.book-percent-input { width: 5em !important; flex: none; }
+.book-date { flex: none; min-width: 7.5em; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .book-editor { display: grid; grid-template-columns: 2fr 2fr 1fr; gap: 12px; padding: 4px 16px 16px; }
 .book-editor .wide, .book-editor .actions { grid-column: 1 / -1; }
 .book-editor .actions { margin-top: 4px; }
@@ -308,5 +328,8 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
   .book-editor { grid-template-columns: 1fr; }
   .book-row { flex-wrap: wrap; row-gap: 0; }
   .book-title { flex-basis: 100%; white-space: normal; }
+  .book-row { align-items: center; }
+  .book-date { min-width: 0; }
+  .book-percent-slider { min-height: 44px; }
 }
 .toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }

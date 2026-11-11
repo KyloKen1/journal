@@ -71,12 +71,14 @@
     hidePage();
     check("the book is saved", await until(() => puts.length === 1 && status.textContent === "Saved"));
     check("it is saved to books.json, created without a version", puts[0]?.path === "books.json" && puts[0]?.sha === undefined);
-    check("the saved file holds the book and its notes", puts[0]?.data.books.length === 1 && puts[0].data.books[0].title === "Dune" && puts[0].data.books[0].liked === "The world");
+    check("the saved file holds the book and its notes", puts[0]?.data.books.length === 1 && puts[0].data.books[0].title === "Dune" && puts[0].data.books[0].liked === "The world" && puts[0].data.books[0].percent === 0);
     check("journal.json is not rewritten by a book edit", puts.every((p) => p.path !== "journal.json"));
 
     type(view.querySelector(".book-disliked"), "Slow middle");
+    type(view.querySelector(".book-percent-slider"), "30");
     hidePage();
     check("a second edit saves on top of the first version", await until(() => puts.length === 2) && puts[1].path === "books.json" && puts[1].sha === "books.json-v1" && puts[1].data.books[0].disliked === "Slow middle");
+    check("the percentage read is saved with the book", puts[1]?.data.books[0].percent === 30);
 
     document.querySelector('[data-tab="todo"]').click();
     type(view.querySelector(".todo-add"), "New to-do");

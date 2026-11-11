@@ -9,7 +9,7 @@
   const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
 
   try {
-    const { normalizeBooks, newBook, sortedBooks } = await import("../books-model.js");
+    const { clampPercent, normalizeBooks, newBook, sortedBooks } = await import("../books-model.js");
     const { renderBooks } = await import("../books.js");
     const { createDirtySave } = await import("../journal-save.js");
     const { todayISO } = await import("../format.js");
@@ -21,25 +21,32 @@
     const throws = (fn) => { try { fn(); return false; } catch { return true; } };
     check("a file without a books list is refused", throws(() => normalizeBooks({})) && throws(() => normalizeBooks(null)) && throws(() => normalizeBooks({ books: "x" })) && throws(() => normalizeBooks([])));
     {
-      const full = { id: "b1", title: "Dune", author: "Frank Herbert", finished: "2026-10-02", liked: "The world", disliked: "The pacing" };
+      const full = { id: "b1", title: "Dune", author: "Frank Herbert", percent: 40, finished: "2026-10-02", liked: "The world", disliked: "The pacing" };
       check("a complete book is kept as it is", JSON.stringify(normalizeBooks({ books: [full] })) === JSON.stringify([full]));
       const repaired = normalizeBooks({ books: [{ title: "Only a title", finished: "last week", liked: 5 }, "junk", null] });
       check("a hand-edited book with missing fields is repaired",
         repaired.length === 1 && repaired[0].title === "Only a title" && repaired[0].author === "" && repaired[0].finished === "" &&
         repaired[0].liked === "" && repaired[0].disliked === "" && typeof repaired[0].id === "string" && repaired[0].id.length > 0);
+      check("a book saved before percentages existed counts as fully read", repaired[0].percent === 100);
+      const odd = normalizeBooks({ books: [{ percent: 250 }, { percent: -3 }, { percent: 33.6 }, { percent: "50" }] }).map((b) => b.percent).join(",");
+      check("a saved percentage is kept within 0 to 100 as a whole number", odd === "100,0,34,100");
+      check("typed percentages are tidied", [clampPercent("45"), clampPercent(""), clampPercent("abc"), clampPercent("150"), clampPercent(-1), clampPercent("12.5")].join(",") === "45,0,0,100,0,13");
     }
     {
-      const book = newBook("2026-11-11");
-      check("a new book is blank and finished today",
-        book.title === "" && book.author === "" && book.liked === "" && book.disliked === "" && book.finished === "2026-11-11" && book.id.length > 0);
-      check("new books get different ids", newBook("2026-11-11").id !== book.id);
+      const book = newBook();
+      check("a new book is blank, not started and not finished",
+        book.title === "" && book.author === "" && book.liked === "" && book.disliked === "" && book.percent === 0 && book.finished === "" && book.id.length > 0);
+      check("new books get different ids", newBook().id !== book.id);
     }
     {
-      const b = (id, finished) => ({ id, title: id, author: "", finished, liked: "", disliked: "" });
+      const b = (id, finished, percent = 100) => ({ id, title: id, author: "", percent, finished, liked: "", disliked: "" });
       const books = [b("old", "2025-01-05"), b("undated", ""), b("new", "2026-11-01"), b("same-a", "2026-03-03"), b("same-b", "2026-03-03")];
       const order = sortedBooks(books).map((x) => x.id).join(",");
       check("books sort newest finished first, undated last, later-added first among equals", order === "new,same-b,same-a,old,undated");
       check("sorting leaves the saved order alone", books[0].id === "old");
+      const mixed = [b("done", "2026-11-01"), b("reading-a", "", 20), b("reading-b", "", 80), b("dated-but-unfinished", "2026-12-01", 99)];
+      check("books still being read come before finished ones, later-added first",
+        sortedBooks(mixed).map((x) => x.id).join(",") === "dated-but-unfinished,reading-b,reading-a,done");
     }
 
     // ---- saving only the file that changed ----
@@ -91,8 +98,8 @@
     const type = (input, text) => { input.value = text; input.dispatchEvent(new Event("input", { bubbles: true })); };
     const state = {
       books: [
-        { id: "b1", title: "Dune", author: "Frank Herbert", finished: "2026-10-02", liked: "The world", disliked: "The pacing" },
-        { id: "b2", title: "Project Hail Mary", author: "Andy Weir", finished: "2026-11-01", liked: "", disliked: "" },
+        { id: "b1", title: "Dune", author: "Frank Herbert", percent: 100, finished: "2026-10-02", liked: "The world", disliked: "The pacing" },
+        { id: "b2", title: "Project Hail Mary", author: "Andy Weir", percent: 100, finished: "2026-11-01", liked: "", disliked: "" },
       ],
     };
     let changes = 0;
@@ -102,6 +109,7 @@
     check("the list shows books newest first", titles() === "Project Hail Mary|Dune");
     check("a row shows the author and the finished date", $(".book-author").textContent === "Andy Weir" && $(".book-date").textContent === "Sun 1 Nov 2026");
     check("the count is shown", $(".book-count").textContent === "2 books");
+    check("each row has a progress bar and a percentage", $$(".book-row progress.book-bar").length === 2 && $(".book-bar").value === 100 && $(".book-bar").max === 100 && $(".book-percent").textContent === "100%");
     check("no editor is open to begin with", !$(".book-editor"));
     check("nothing on the tab mentions Claude or suggestions", !/claude|suggest/i.test(view.textContent) && !$(".badge"));
 
@@ -120,10 +128,36 @@
 
     changes = 0;
     $(".book-add").click();
-    check("Add book makes a blank book finished today, opens it and asks for a save",
-      state.books.length === 3 && state.books[2].title === "" && state.books[2].finished === todayISO() && changes === 1 &&
+    check("Add book makes a blank, unstarted book, opens it and asks for a save",
+      state.books.length === 3 && state.books[2].title === "" && state.books[2].percent === 0 && state.books[2].finished === "" && changes === 1 &&
       $(".book-title-input").value === "" && document.activeElement === $(".book-title-input"));
     check("an untitled book reads Untitled in the list", $(".book.open .book-title").textContent === "Untitled");
+    check("a book being read is listed first and counted", $(".book").classList.contains("open") && $(".book-count").textContent === "1 reading · 2 finished");
+    check("its bar starts empty with no finished date", $(".book.open .book-bar").value === 0 && $(".book.open .book-percent").textContent === "0%" && $(".book.open .book-date").textContent === "");
+
+    type($(".book-percent-slider"), "45");
+    check("moving the slider sets the percentage, the bar and the number box",
+      state.books[2].percent === 45 && $(".book.open .book-bar").value === 45 && $(".book.open .book-percent").textContent === "45%" &&
+      $(".book-percent-input").value === "45" && state.books[2].finished === "" && changes === 2);
+    type($(".book-percent-input"), "150");
+    check("a typed number over 100 counts as 100 and moves the slider", state.books[2].percent === 100 && $(".book-percent-slider").value === "100");
+    check("the box being typed in is not rewritten mid-typing", $(".book-percent-input").value === "150");
+    $(".book-percent-input").dispatchEvent(new Event("change", { bubbles: true }));
+    check("it is tidied once typing stops", $(".book-percent-input").value === "100");
+    check("reaching 100% fills in today as the finished date",
+      state.books[2].finished === todayISO() && $(".book-finished-input").value === todayISO() && $(".book-count").textContent === "3 books");
+    type($(".book-percent-slider"), "60");
+    type($(".book-percent-slider"), "100");
+    check("a finished date already there is kept", state.books[2].finished === todayISO());
+    {
+      const before = state.books[0].finished;
+      state.books[0].percent = 90;
+      $$(".book-row").find((r) => r.textContent.includes("Dune")).click();
+      type($(".book-percent-slider"), "100");
+      check("an older finished date is not replaced by today", state.books[0].finished === before);
+      $$(".book-row").find((r) => r.textContent.includes("Untitled")).click();
+    }
+    changes = 1;
 
     const realConfirm = window.confirm;
     window.confirm = () => false;
