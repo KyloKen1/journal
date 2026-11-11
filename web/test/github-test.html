@@ -1,0 +1,111 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>github.js tests</title>
+<pre id="out">Running…</pre>
+<script type="module">
+  const out = document.getElementById("out");
+  const failures = [];
+  let count = 0;
+  const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
+
+  try {
+    const { createStorage, StorageError } = await import("../github.js");
+    const { DATA_REPO, JOURNAL_PATH, SUGGESTIONS_PATH, TOKEN_KEY } = await import("../config.js");
+
+    check("config names the data repo and files",
+      DATA_REPO === "KyloKen1/journal-data" && JOURNAL_PATH === "journal.json" &&
+      SUGGESTIONS_PATH === "suggestions.json" && TOKEN_KEY === "journal.githubToken");
+
+    const toBase64 = (text) => btoa(String.fromCharCode(...new TextEncoder().encode(text)));
+    const fromBase64 = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+    const wrap60 = (s) => s.replace(/(.{60})/g, "$1\n");
+    const json = (status, body) => new Response(JSON.stringify(body), { status });
+
+    // A fake GitHub: records requests, answers from a queue of functions.
+    function fake(...answers) {
+      const calls = [];
+      const fetch = async (url, init = {}) => {
+        calls.push({ url, init });
+        return answers.shift()(url, init);
+      };
+      return { calls, storage: createStorage({ repo: DATA_REPO, getToken: () => "T", fetch }) };
+    }
+    const kindOf = async (promise) => {
+      try { await promise; return "no error"; } catch (e) { return e instanceof StorageError ? e.kind : `other: ${e}`; }
+    };
+
+    // load
+    {
+      const data = { todos: [{ title: "x".repeat(200) }], wishlist: [] };
+      const f = fake(() => json(200, { sha: "abc", encoding: "base64", content: wrap60(toBase64(JSON.stringify(data))) }));
+      const got = await f.storage.load("journal.json");
+      const { url, init } = f.calls[0];
+      const headers = new Headers(init.headers);
+      check("load asks the contents API for the file", url === "https://api.github.com/repos/KyloKen1/journal-data/contents/journal.json");
+      check("load sends the token", headers.get("Authorization") === "Bearer T");
+      check("load asks for GitHub JSON", headers.get("Accept") === "application/vnd.github+json");
+      check("load bypasses the browser cache", init.cache === "no-store");
+      check("load decodes wrapped base64", JSON.stringify(got.data) === JSON.stringify(data));
+      check("load returns the sha", got.sha === "abc");
+    }
+
+    // save
+    {
+      const data = { todos: [], wishlist: [{ name: "Keyboard" }] };
+      const f = fake(() => json(200, { content: { sha: "def" } }));
+      const sha = await f.storage.save("journal.json", data, "abc");
+      const { url, init } = f.calls[0];
+      const body = JSON.parse(init.body);
+      check("save PUTs to the file", init.method === "PUT" && url.endsWith("/contents/journal.json"));
+      check("save sends the sha it was based on", body.sha === "abc");
+      check("save sets a commit message", body.message === "Update journal.json");
+      check("save writes 2-space JSON", fromBase64(body.content) === JSON.stringify(data, null, 2));
+      check("save returns the new sha", sha === "def");
+    }
+
+    // round trip with accents and emoji
+    {
+      const data = { title: "Café ☕ naïve – 日本" };
+      let stored;
+      const f = fake(
+        (url, init) => { stored = JSON.parse(init.body).content; return json(200, { content: { sha: "s2" } }); },
+        () => json(200, { sha: "s2", encoding: "base64", content: stored }),
+      );
+      await f.storage.save("journal.json", data, "s1");
+      const got = await f.storage.load("journal.json");
+      check("accents and emoji survive save and load", got.data.title === data.title);
+    }
+
+    // errors
+    for (const [status, kind] of [[401, "auth"], [403, "auth"], [404, "auth"], [409, "conflict"], [422, "conflict"], [500, "http"]]) {
+      const f = fake(() => json(status, { message: "nope" }));
+      check(`save ${status} is ${kind}`, await kindOf(f.storage.save("journal.json", {}, "abc")) === kind);
+    }
+    {
+      const f = fake(() => json(401, {}));
+      check("load 401 is auth", await kindOf(f.storage.load("journal.json")) === "auth");
+    }
+    {
+      const f = fake(() => json(500, {}));
+      let status = null;
+      try { await f.storage.load("journal.json"); } catch (e) { status = e.status; }
+      check("http error carries the status", status === 500);
+    }
+    {
+      const f = fake(() => { throw new TypeError("Failed to fetch"); });
+      check("network failure is offline", await kindOf(f.storage.load("journal.json")) === "offline");
+    }
+    {
+      const f = fake(() => json(200, { sha: "big", encoding: "none", content: "" }));
+      check("file too large for inline content is invalid", await kindOf(f.storage.load("journal.json")) === "invalid");
+    }
+    {
+      const f = fake(() => json(200, { sha: "x", encoding: "base64", content: toBase64("not json {") }));
+      check("non-JSON content is invalid", await kindOf(f.storage.load("journal.json")) === "invalid");
+    }
+  } catch (e) {
+    failures.push(`FAIL test page crashed: ${e}`);
+  }
+
+  out.textContent = failures.length ? failures.join("\n") : `All ${count} passed`;
+</script>
