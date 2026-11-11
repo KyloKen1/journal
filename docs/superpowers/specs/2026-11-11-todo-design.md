@@ -1,7 +1,7 @@
 # To-Do List on Any Device — Design
 
 Date: 2026-11-11
-Status: Draft, awaiting owner review
+Status: Approved 2026-11-11; updated the same day with three changes made while planning (conversion in the page, a data tool for the skills, 404 treated as a rejected token)
 Replaces parts of: `docs/superpowers/specs/2026-11-03-journal-design.md` (Work tab, server, saving)
 Changes: `docs/superpowers/specs/2026-11-05-wishlist-suggestions-design.md` (where suggestions are stored)
 
@@ -79,9 +79,13 @@ web/test/*.html            browser tests (see section 8)
 .claude/skills/check-todos/SKILL.md       the morning check procedure                                (new)
 .claude/skills/update-wishlist/SKILL.md   reads and writes through gh api instead of localhost
 Journal.bat                               opens the web address
+
+tools/data.py                             Claude's read/write access to the data repo, through gh  (new)
+tools/webtests.py                         runs the browser tests from the command line             (new)
+tests/test_data_tool.py                   tests for tools/data.py                                  (new)
 ```
 
-Deleted: `server.py`, `store.py`, `suggestions.py`, `tests/` (Git history keeps them).
+Deleted: `server.py`, `store.py`, `suggestions.py` and their tests (Git history keeps them).
 
 ## 3. Data
 
@@ -131,7 +135,7 @@ Deleted: `server.py`, `store.py`, `suggestions.py`, `tests/` (Git history keeps 
 - `dismissed` keeps the last 10 dismissed suggestion texts per item, so Claude does not repeat them.
 
 ### One-time conversion
-Claude runs a one-off script that reads `data\journal.json` on this PC and pushes the converted files to `journal-data`:
+At the cutover the existing `data\journal.json` is uploaded to `journal-data` as it is. The first time the page loads a file in the old shape, it converts it and saves it back:
 
 | Work card | To-do item |
 |---|---|
@@ -188,7 +192,7 @@ No change to how it looks or works.
 
 ### Morning check
 - A scheduled task in the Claude desktop app on this PC runs at 08:00, Monday to Friday, in `C:\Dev\journal`, and follows the `check-todos` skill. Saying "check my to-do list" in a Claude session there runs the same skill on request.
-- The skill reads `journal.json` and `suggestions.json` from `journal-data` with `gh api`, and writes back only `suggestions.json`.
+- The skill reads `journal.json` and `suggestions.json` from `journal-data` with `tools/data.py` (a small wrapper around `gh api` that also checks the file's shape before uploading), and writes back only `suggestions.json`.
 - For each open item it posts at most 2 suggestions, chosen from:
   - a concrete next step, when Up next is empty;
   - a way to split a large or vague item into smaller steps;
@@ -201,7 +205,7 @@ No change to how it looks or works.
 **Limit:** the task runs only when this PC is on with the Claude app open. A missed morning is not caught up; the next scheduled run does the check.
 
 ### Wishlist price suggestions
-Same behaviour as today, still only on request. The `update-wishlist` skill reads and writes through `gh api` instead of the local server, and saves the owner's `Want:` / `Budget:` answers into `journal.json` with a normal `sha`-checked save.
+Same behaviour as today, still only on request. The `update-wishlist` skill reads and writes through `tools/data.py` instead of the local server, and saves the owner's `Want:` / `Budget:` answers into `journal.json` with a normal `sha`-checked save.
 
 ## 6. Saving
 
@@ -215,7 +219,7 @@ Same behaviour as today, still only on request. The `update-wishlist` skill read
 | Situation | Behaviour |
 |---|---|
 | No token on this device | Setup screen. |
-| Token rejected or expired (GitHub answers 401 or 403) | "GitHub did not accept this device's token. Enter a new one." with the setup screen. Unsaved edits stay in the page and are saved once a working token is entered. |
+| Token rejected, expired, or not allowed to see the data repo (GitHub answers 401, 403 or 404) | "GitHub did not accept this device's token. Enter a new one." with the setup screen. Unsaved edits stay in the page and are saved once a working token is entered. |
 | No connection, or GitHub unreachable | Red bar: "Not saved — no connection. Retrying." Retries every 10 seconds. |
 | Cannot load at start-up | Same red bar; the list is not shown until loading succeeds, so nothing is typed onto an empty copy. |
 | List changed on another device since this one loaded (GitHub answers 409) | "This list was changed on another device. Reload to continue." The page goes read-only, as it does today. |
@@ -225,11 +229,12 @@ Same behaviour as today, still only on request. The `update-wishlist` skill read
 
 ## 8. Testing
 
-Browser test pages in `web/test/`, opened through a throwaway local web server (`python -m http.server`), each showing a pass/fail list:
+Browser test pages in `web/test/`, each showing a pass/fail list. `python tools/webtests.py` runs them all in headless Chrome; `python -m unittest discover -s tests -t .` runs the data tool's tests.
 
 - **`github-test.html`** — `github.js` against a fake `fetch`: load decodes the file and returns its `sha`; save sends the `sha` and returns the new one; text with accents and emoji survives a save and load; 401, 409 and network failure are reported as distinct errors.
 - **`todo-model-test.html`** — a Work card converts field by field, including an archived one; carried-over days are 0 for today, 1 for yesterday, and correct across a month end; "Add to Up next" appends the steps and removes the suggestion; dismissing records the text and keeps only the last 10.
 - **`save-test.html`** (updated) — autosave through the fake storage: one save per burst of edits, retry after a failure, stop after a conflict.
+- **`suggest-store-test.html`**, **`token-test.html`**, **`todo-ui-test.html`** — the suggestions file with conflict retry, the token setup screen, and the To-Do tab's behaviour in the page.
 - Existing `format-test.html` and `suggest-test.html` keep passing.
 
 Manual checks on the published page:
