@@ -3,7 +3,22 @@
 <title>suggest.js tests</title>
 <pre id="out">Running…</pre>
 <script type="module">
-  import { acceptOption, createDismissQueue, formatCheckedDate, latestChecked } from "../suggest.js";
+  import {
+    acceptOption, createDismissQueue, dismissSuggestions, dismissTodoSuggestion, formatCheckedDate,
+    initSuggestions, latestChecked, loadSuggestions, todoAcceptedQueue,
+  } from "../suggest.js";
+
+  // A fake suggestion store: update() applies the change to `file` and reports success.
+  function fakeStore(file, { loadFails = false, updateOk = true } = {}) {
+    return {
+      async load() { if (loadFails) throw new Error("offline"); return structuredClone(file); },
+      async update(mutate) { if (updateOk) mutate(file); return updateOk; },
+    };
+  }
+  const sampleFile = () => ({
+    items: { w1: { options: [] }, w2: { options: [] } },
+    todos: { t1: { suggestions: [{ id: "g1", text: "Split it", steps: ["a"] }, { id: "g2", text: "Stalled", steps: [] }], dismissed: [] } },
+  });
 
   const option = { name: "Kingston 16GB DDR4", price: 649, link: "https://x.co/r", shop: "Evetech", note: "" };
   const item = (notes = "") => ({ name: "RAM", price: null, link: "", notes, bought: false });
@@ -38,6 +53,48 @@
     }, true],
   ];
   for (const [name, run, expected] of queueCases) cases.push([name, run, expected]);
+
+  // Everything below goes through the store set with initSuggestions().
+  const storeCases = [
+    ["loadSuggestions returns both sections", async () => {
+      initSuggestions(fakeStore(sampleFile()));
+      const s = await loadSuggestions();
+      return `${Object.keys(s.items).join()} ${Object.keys(s.todos).join()}`;
+    }, "w1,w2 t1"],
+    ["loadSuggestions is empty when loading fails", async () => {
+      initSuggestions(fakeStore(sampleFile(), { loadFails: true }));
+      return JSON.stringify(await loadSuggestions());
+    }, JSON.stringify({ items: {}, todos: {} })],
+    ["dismissSuggestions removes that wishlist entry", async () => {
+      const file = sampleFile();
+      initSuggestions(fakeStore(file));
+      const ok = await dismissSuggestions("w1");
+      return `${ok} ${Object.keys(file.items).join()}`;
+    }, "true w2"],
+    ["dismissSuggestions reports a failed save", async () => {
+      initSuggestions(fakeStore(sampleFile(), { updateOk: false }));
+      return dismissSuggestions("w1");
+    }, false],
+    ["dismissTodoSuggestion removes it and records the text", async () => {
+      const file = sampleFile();
+      initSuggestions(fakeStore(file));
+      const ok = await dismissTodoSuggestion("t1", "g2");
+      return `${ok} ${file.todos.t1.suggestions.map((s) => s.id).join()} ${file.todos.t1.dismissed.join()}`;
+    }, "true g1 Stalled"],
+    ["dismissTodoSuggestion for an unknown todo does not throw", async () => {
+      initSuggestions(fakeStore(sampleFile()));
+      return dismissTodoSuggestion("gone", "g1");
+    }, true],
+    ["an accepted to-do suggestion is removed on flush, not recorded as dismissed", async () => {
+      const file = sampleFile();
+      initSuggestions(fakeStore(file));
+      todoAcceptedQueue.add("t1/g1");
+      const before = file.todos.t1.suggestions.length;
+      await todoAcceptedQueue.flush();
+      return `${before} ${file.todos.t1.suggestions.map((s) => s.id).join()} ${file.todos.t1.dismissed.length} ${todoAcceptedQueue.has("t1/g1")}`;
+    }, "2 g2 0 false"],
+  ];
+  for (const c of storeCases) cases.push(c);
 
   const failures = [];
   for (const [name, run, expected] of cases) {

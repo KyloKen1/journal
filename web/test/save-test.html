@@ -1,9 +1,10 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>save.js tests</title>
-<pre id="out">Running… (takes a few seconds)</pre>
+<pre id="out">Running…</pre>
 <script type="module">
   import { createSaver } from "../save.js";
+  import { StorageError } from "../github.js";
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const leavePrompted = () => {
@@ -11,21 +12,83 @@
     window.dispatchEvent(ev);
     return ev.defaultPrevented;
   };
-
-  // Every test page load creates one saver; fake the server so nothing real is written.
-  window.fetch = async () => new Response(JSON.stringify({ error: "conflict" }), { status: 409 });
-  const statuses = [];
-  const saver = createSaver({ getData: () => ({ version: 0, issues: [], wishlist: [] }), onStatus: (s) => statuses.push(s) });
-
   const failures = [];
-  const check = (name, ok) => { if (!ok) failures.push(`FAIL ${name}`); };
+  let count = 0;
+  const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
 
-  saver.changed();
-  await wait(1300);
-  check("conflict reported", statuses.includes("conflict"));
-  check("edit that hit a conflict still prompts before leaving", leavePrompted());
-  saver.changed();
-  check("edits after a conflict still prompt before leaving", leavePrompted());
+  // A saver over a scripted save(): each entry is "ok" or a StorageError kind to throw.
+  function make(...script) {
+    const statuses = [];
+    const errors = [];
+    let calls = 0;
+    const saver = createSaver({
+      debounceMs: 50,
+      retryMs: 100,
+      save: async () => {
+        calls++;
+        const step = script.shift() ?? "ok";
+        if (step !== "ok") throw new StorageError(step, step === "http" ? 500 : null);
+      },
+      onStatus: (s, e) => { statuses.push(s); if (e) errors.push(e); },
+    });
+    return { saver, statuses, errors, calls: () => calls };
+  }
 
-  document.getElementById("out").textContent = failures.length ? failures.join("\n") : "All 3 passed";
+  try {
+    {
+      const t = make();
+      t.saver.changed(); t.saver.changed(); t.saver.changed();
+      check("nothing is saved before the pause ends", t.calls() === 0);
+      await wait(200);
+      check("a burst of edits makes one save", t.calls() === 1);
+      check("a good save reports saving then saved", t.statuses.join() === "saving,saved");
+      check("saver is idle after saving", t.saver.isIdle());
+    }
+    {
+      const t = make("offline", "offline", "ok");
+      t.saver.changed();
+      await wait(500);
+      check("no connection reports offline", t.statuses.includes("offline"));
+      check("offline save is retried until it works", t.calls() === 3 && t.statuses.at(-1) === "saved");
+      await wait(300);
+      check("retrying stops once saved", t.calls() === 3);
+    }
+    {
+      const t = make("http", "ok");
+      t.saver.changed();
+      await wait(400);
+      check("a GitHub error reports error with its status", t.statuses.includes("error") && t.errors[0]?.status === 500);
+      check("a GitHub error is retried", t.statuses.at(-1) === "saved" && t.calls() === 2);
+    }
+    {
+      const t = make("auth", "ok");
+      t.saver.changed();
+      await wait(400);
+      check("a rejected token reports auth", t.statuses.at(-1) === "auth");
+      check("a rejected token is not retried on its own", t.calls() === 1);
+      check("the unsaved edit is still pending", !t.saver.isIdle());
+      t.saver.resume();
+      await wait(200);
+      check("resume saves the pending edit", t.calls() === 2 && t.statuses.at(-1) === "saved" && t.saver.isIdle());
+    }
+    {
+      check("nothing prompts before leaving once all is saved", !leavePrompted());
+      const t = make("conflict");
+      t.saver.changed();
+      await wait(200);
+      check("conflict reported", t.statuses.at(-1) === "conflict");
+      check("edit that hit a conflict still prompts before leaving", leavePrompted());
+      t.saver.changed();
+      await wait(200);
+      check("no save is tried after a conflict", t.calls() === 1);
+      check("edits after a conflict still prompt before leaving", leavePrompted());
+      t.saver.resume();
+      await wait(200);
+      check("resume does not restart a saver stopped by a conflict", t.calls() === 1);
+    }
+  } catch (e) {
+    failures.push(`FAIL test page crashed: ${e}`);
+  }
+
+  document.getElementById("out").textContent = failures.length ? failures.join("\n") : `All ${count} passed`;
 </script>

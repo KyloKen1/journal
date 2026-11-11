@@ -1,55 +1,62 @@
-// Autosave: debounces edits, PUTs the whole journal, retries while the server is down,
-// and stops for good if another tab saved a newer version.
+// Autosave: waits for a pause in editing, then calls save(). Retries while GitHub can't be
+// reached, pauses when the token is rejected, and stops for good if the list was changed
+// on another device.
 
-const DEBOUNCE_MS = 1000;
-const RETRY_MS = 10000;
-
-export function createSaver({ getData, onStatus }) {
+export function createSaver({ save, onStatus, debounceMs = 3000, retryMs = 10000 }) {
   let timer = null;
   let retryTimer = null;
   let pending = false;
   let inFlight = false;
-  let stopped = false;
+  let stopped = false; // conflict: never save again from this page
+  let paused = false; // token rejected: wait for resume()
+
+  function stopRetrying() {
+    clearInterval(retryTimer);
+    retryTimer = null;
+  }
 
   function changed() {
     pending = true; // after a conflict this still arms the leave-page prompt
-    if (stopped) return;
+    if (stopped || paused) return;
     clearTimeout(timer);
-    timer = setTimeout(flush, DEBOUNCE_MS);
+    timer = setTimeout(flush, debounceMs);
   }
 
   async function flush() {
-    if (stopped || inFlight || !pending) return;
+    if (stopped || paused || inFlight || !pending) return;
     inFlight = true;
     pending = false;
     onStatus("saving");
     try {
-      const res = await fetch("/api/data", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(getData()),
-      });
-      if (res.status === 409) {
+      await save();
+      stopRetrying();
+      onStatus("saved");
+    } catch (error) {
+      pending = true; // this edit was not saved
+      if (error.kind === "conflict") {
         stopped = true;
-        pending = true; // this edit was not saved
-        clearInterval(retryTimer);
+        stopRetrying();
         onStatus("conflict");
-        return;
+      } else if (error.kind === "auth") {
+        paused = true;
+        stopRetrying();
+        onStatus("auth");
+      } else {
+        onStatus(error.kind === "offline" ? "offline" : "error", error);
+        retryTimer ??= setInterval(flush, retryMs);
       }
-      if (!res.ok) throw new Error(`save failed: ${res.status}`);
-      const { version } = await res.json();
-      clearInterval(retryTimer);
-      retryTimer = null;
-      onStatus("saved", version);
-    } catch {
-      pending = true;
-      onStatus("offline");
-      retryTimer ??= setInterval(flush, RETRY_MS);
     } finally {
       inFlight = false;
       // Edits made while this save was in flight still need saving.
-      if (pending && !stopped && !retryTimer) flush();
+      if (pending && !stopped && !paused && !retryTimer) flush();
     }
+  }
+
+  // Call once a working token has been entered.
+  function resume() {
+    if (stopped || !paused) return;
+    paused = false;
+    flush();
   }
 
   window.addEventListener("beforeunload", (e) => {
@@ -57,7 +64,7 @@ export function createSaver({ getData, onStatus }) {
   });
 
   // True when every edit is saved and saving still works.
-  const isIdle = () => !pending && !inFlight && !stopped;
+  const isIdle = () => !pending && !inFlight && !stopped && !paused;
 
-  return { changed, isIdle };
+  return { changed, isIdle, resume };
 }

@@ -1,6 +1,7 @@
 // Claude's buy suggestions for wishlist items: loading, Accept/Dismiss, and the editor section.
 import { el } from "./dom.js";
 import { formatRand, safeLink } from "./format.js";
+import { dismissSuggestion, removeSuggestion } from "./todo-model.js";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -25,26 +26,40 @@ export function formatCheckedDate(iso) {
   return `${DAYS[date.getDay()]} ${d} ${MONTHS[m - 1]}`;
 }
 
+// The suggestions file, set once at start-up (a createSuggestionStore() result).
+let store = null;
+
+export function initSuggestions(suggestionStore) {
+  store = suggestionStore;
+}
+
+// { items: wishlist suggestions by item id, todos: to-do suggestions by todo id }
 export async function loadSuggestions() {
   try {
-    const res = await fetch("/api/suggestions");
-    if (!res.ok) return {};
-    return (await res.json()).items;
+    return await store.load();
   } catch {
-    return {};
+    return { items: {}, todos: {} };
   }
 }
 
-export async function dismissSuggestions(itemId) {
-  try {
-    const res = await fetch(`/api/suggestions/${encodeURIComponent(itemId)}`, { method: "DELETE" });
-    return res.ok;
-  } catch {
-    return false;
-  }
+const update = (mutate) => (store ? store.update(mutate) : Promise.resolve(false));
+
+export function dismissSuggestions(itemId) {
+  return update((data) => { delete data.items[itemId]; });
 }
 
-// Items whose suggestion was accepted. They are cleared on the server only once the journal has
+// Dismissed by the owner: the text is remembered so Claude doesn't repeat it.
+export function dismissTodoSuggestion(todoId, suggestionId) {
+  return update((data) => dismissSuggestion(data.todos[todoId], suggestionId));
+}
+
+// Accepted by the owner: just removed. key is "<todo id>/<suggestion id>".
+function removeTodoSuggestion(key) {
+  const [todoId, suggestionId] = key.split("/");
+  return update((data) => { removeSuggestion(data.todos[todoId], suggestionId); });
+}
+
+// Items whose suggestion was accepted. They are cleared in the data repo only once the journal has
 // saved the accepted change, so a failed save never loses Claude's research for that item.
 export function createDismissQueue(dismiss) {
   const ids = new Set();
@@ -60,6 +75,7 @@ export function createDismissQueue(dismiss) {
 }
 
 export const acceptedQueue = createDismissQueue(dismissSuggestions);
+export const todoAcceptedQueue = createDismissQueue(removeTodoSuggestion);
 
 export function renderSuggestions(entry, { onAccept, onDismiss }) {
   return el("section", { class: "suggestions" },

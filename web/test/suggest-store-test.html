@@ -1,0 +1,85 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>suggest-store.js tests</title>
+<pre id="out">Running…</pre>
+<script type="module">
+  const failures = [];
+  let count = 0;
+  const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+  try {
+    const { createSuggestionStore } = await import("../suggest-store.js");
+    const { StorageError } = await import("../github.js");
+
+    // A fake data repo holding one file, refusing saves based on an old sha like GitHub does.
+    function fakeStorage(initial) {
+      const repo = { data: structuredClone(initial), version: 1, saves: 0, failNext: null };
+      const storage = {
+        async load() { return { data: structuredClone(repo.data), sha: `v${repo.version}` }; },
+        async save(path, data, sha) {
+          repo.saves++;
+          if (repo.failNext) { const kind = repo.failNext; repo.failNext = null; throw new StorageError(kind); }
+          if (sha !== `v${repo.version}`) throw new StorageError("conflict", 409);
+          repo.data = structuredClone(data);
+          repo.version++;
+          return `v${repo.version}`;
+        },
+      };
+      // Someone else (Claude's morning check, another device) changes the file.
+      repo.changeElsewhere = (mutate = () => {}) => { mutate(repo.data); repo.version++; };
+      return { repo, store: createSuggestionStore({ storage, path: "suggestions.json" }) };
+    }
+
+    {
+      const { store } = fakeStorage({ items: { a: { options: [] } } });
+      const loaded = await store.load();
+      check("load fills in a missing todos section", same(loaded, { items: { a: { options: [] } }, todos: {} }));
+      loaded.items.b = 1;
+      check("load hands out a copy", same(await store.load(), { items: { a: { options: [] } }, todos: {} }));
+    }
+    {
+      const { repo, store } = fakeStorage({ items: { a: 1, b: 2 }, todos: {} });
+      await store.load();
+      const ok = await store.update((d) => { delete d.items.a; });
+      check("update saves the changed file", ok === true && same(repo.data, { items: { b: 2 }, todos: {} }));
+    }
+    {
+      const { repo, store } = fakeStorage({ items: { a: 1 }, todos: {} });
+      await store.load();
+      repo.changeElsewhere((d) => { d.todos.t9 = { suggestions: [] }; });
+      const ok = await store.update((d) => { delete d.items.a; });
+      check("update after a change elsewhere reloads and re-applies", ok === true && same(repo.data, { items: {}, todos: { t9: { suggestions: [] } } }));
+      check("that took two save attempts", repo.saves === 2);
+    }
+    {
+      const { repo, store } = fakeStorage({ items: { a: 1, b: 2 }, todos: {} });
+      await store.load();
+      const [one, two] = await Promise.all([
+        store.update((d) => { delete d.items.a; }),
+        store.update((d) => { delete d.items.b; }),
+      ]);
+      check("two updates fired together both land", one && two && same(repo.data, { items: {}, todos: {} }));
+    }
+    {
+      const { repo, store } = fakeStorage({ items: { a: 1 }, todos: {} });
+      await store.load();
+      repo.failNext = "offline";
+      check("update with no connection returns false", (await store.update((d) => { delete d.items.a; })) === false);
+      check("a failed update leaves the file alone", same(repo.data, { items: { a: 1 }, todos: {} }));
+      check("a later update still works", (await store.update((d) => { delete d.items.a; })) === true && same(repo.data.items, {}));
+    }
+    {
+      // The file changes again before every attempt, so both saves conflict.
+      const { repo, store } = fakeStorage({ items: { a: 1 }, todos: {} });
+      await store.load();
+      const ok = await store.update((d) => { delete d.items.a; repo.changeElsewhere(); });
+      check("two conflicts in a row returns false", ok === false && repo.saves === 2);
+      check("the file is untouched after two conflicts", same(repo.data.items, { a: 1 }));
+    }
+  } catch (e) {
+    failures.push(`FAIL test page crashed: ${e}`);
+  }
+
+  document.getElementById("out").textContent = failures.length ? failures.join("\n") : `All ${count} passed`;
+</script>
