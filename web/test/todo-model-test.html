@@ -106,6 +106,14 @@
       check("moveTodo of an unknown item changes nothing", m.moveTodo(t, "nope", "a") === false && ids(t) === "axbc");
     }
 
+    // transferTodo
+    {
+      const a = { id: "a" }, b = { id: "b" }, w = { id: "w" };
+      const from = [a, b], to = [w];
+      check("transferTodo moves the item to the end of the other list", m.transferTodo(from, to, a) === true && same(from, [b]) && same(to, [w, a]) && to[1] === a);
+      check("transferTodo of an item not in the list changes nothing", m.transferTodo(from, to, a) === false && same(from, [b]) && same(to, [w, a]));
+    }
+
     // complete / reopen
     {
       const t = m.newTodo("x", "2026-11-11T08:00:00");

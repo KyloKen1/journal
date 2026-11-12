@@ -23,8 +23,11 @@ const RETRY_LOAD_MS = 10000;
 // Suggestions are Claude's, kept in their own file; the saver never sends them.
 // Books live in their own file (booksSha is its version; null until the file exists).
 const state = { sha: null, todos: [], workTodos: [], wishlist: [], suggestions: {}, todoSuggestions: {}, books: [], booksSha: null };
-const renderWork = (root, state, changed) => renderTodo(root, state, changed, { tab: "work", list: "workTodos" });
-const tabs = { todo: renderTodo, work: renderWork, wishlist: renderWishlist, books: renderBooks };
+const renderPersonal = (root, state, changed) =>
+  renderTodo(root, state, changed, { moveTo: { list: "workTodos", label: "Move to Work" } });
+const renderWork = (root, state, changed) =>
+  renderTodo(root, state, changed, { tab: "work", list: "workTodos", moveTo: { list: "todos", label: "Move to To-Do" } });
+const tabs = { todo: renderPersonal, work: renderWork, wishlist: renderWishlist, books: renderBooks };
 let currentTab = "todo";
 let loaded = false;
 

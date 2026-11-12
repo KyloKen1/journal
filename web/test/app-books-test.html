@@ -94,6 +94,12 @@
     hidePage();
     check("a work item is saved in journal.json beside the to-dos", await until(() => puts.length === 4) && puts[3].path === "journal.json" && puts[3].data.workTodos?.[0]?.title === "Work item" && puts[3].data.todos.length === 2);
 
+    document.querySelector('[data-tab="todo"]').click();
+    [...view.querySelectorAll(".todo-open")].find((b) => b.textContent.includes("Existing to-do")).click();
+    view.querySelector(".item-move").click();
+    hidePage();
+    check("moving a to-do to Work saves it in the work list", await until(() => puts.length === 5) && puts[4].data.workTodos.map((t) => t.title).join("|") === "Work item|Existing to-do" && puts[4].data.todos.length === 1);
+
     document.querySelector('[data-tab="books"]').click();
     check("the book is still there after switching tabs", view.querySelector(".book-title")?.textContent === "Dune");
   } catch (e) {

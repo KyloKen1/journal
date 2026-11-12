@@ -82,6 +82,15 @@ export function moveTodo(todos, id, beforeId) {
   return todos.map((t) => t.id).join("\n") !== order;
 }
 
+// Takes the item out of one list and adds it to the end of another. False if it was not in the first.
+export function transferTodo(from, to, todo) {
+  const at = from.indexOf(todo);
+  if (at < 0) return false;
+  from.splice(at, 1);
+  to.push(todo);
+  return true;
+}
+
 export function completedTodos(todos) {
   return todos.filter((t) => t.completed).sort((a, b) => (b.completedDate ?? "").localeCompare(a.completedDate ?? ""));
 }

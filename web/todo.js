@@ -5,7 +5,7 @@ import { newId, nowISO, todayISO } from "./format.js";
 import { dismissTodoSuggestion, formatCheckedDate, todoAcceptedQueue } from "./suggest.js";
 import {
   applySuggestion, carriedOverDays, completeStep, completeTodo, completedTodos, dismissSuggestion,
-  moveTodo, newTodo, openTodos, pendingSuggestions, reopenTodo,
+  moveTodo, newTodo, openTodos, pendingSuggestions, reopenTodo, transferTodo,
 } from "./todo-model.js";
 
 // Which item is open in each list survives switching tabs, but not a page reload.
@@ -26,7 +26,8 @@ const removeButton = (onclick) =>
   el("button", { type: "button", class: "remove", title: "Remove", "aria-label": "Remove", onclick }, "×");
 
 // tab is the tab's name in the page; list is the name of its list in the saved data.
-export function renderTodo(root, state, changed, { tab = "todo", list = "todos" } = {}) {
+// moveTo, when given, is the other list an item can be sent to: { list, label }.
+export function renderTodo(root, state, changed, { tab = "todo", list = "todos", moveTo = null } = {}) {
   const showing = () => root.isConnected && root.dataset.tab === tab;
   const todos = () => state[list];
 
@@ -303,6 +304,13 @@ export function renderTodo(root, state, changed, { tab = "todo", list = "todos" 
       open(null);
     }
 
+    // Its suggestions are kept by item id, so they follow it to the other list.
+    function moveAcross() {
+      if (!transferTodo(todos(), state[moveTo.list], todo)) return;
+      changed();
+      open(null);
+    }
+
     drawUpNext();
     drawProgress();
     drawSuggestions();
@@ -323,6 +331,7 @@ export function renderTodo(root, state, changed, { tab = "todo", list = "todos" 
           }),
           carriedTag(todo),
           todo.completed && el("span", { class: "todo-tag" }, `completed ${todo.completedDate ?? ""}`),
+          moveTo && el("button", { type: "button", class: "item-move", onclick: moveAcross }, moveTo.label),
           el("button", { type: "button", class: "danger item-delete", onclick: remove }, "Delete"),
         ),
         el("section", { class: "panel desc-col" },

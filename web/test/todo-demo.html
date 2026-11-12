@@ -36,6 +36,7 @@
       todo("blank", "", 0),
       ...Array.from({ length: 5 }, (_, i) => todo(`c${i}`, `Finished item ${i + 1}`, 12, { completed: true, completedDate: daysAgo(i + 1).slice(0, 10) })),
     ],
+    workTodos: [],
     wishlist: [],
     suggestions: {},
     todoSuggestions: {
@@ -57,7 +58,7 @@
 
   // A stand-in for the suggestions file that always saves.
   initSuggestions({ load: async () => ({ items: {}, todos: {} }), update: async () => true });
-  renderTodo(document.getElementById("view"), state, () => { window.demoChanges++; });
+  renderTodo(document.getElementById("view"), state, () => { window.demoChanges++; }, { moveTo: { list: "workTodos", label: "Move to Work" } });
 </script>
 </body>
 </html>

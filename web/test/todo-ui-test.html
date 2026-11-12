@@ -221,6 +221,29 @@
       view.dataset.tab = "todo";
       renderTodo(view, state, () => changes++);
       check("going back to To-Do shows the item that was open there", $(".item") && $(".item .title-input").value !== "Send the report");
+      check("without another list to move to there is no move button", !$(".item-move"));
+    }
+
+    // Moving an item to the other list
+    {
+      renderTodo(view, state, () => changes++, { moveTo: { list: "workTodos", label: "Move to Work" } });
+      const moving = state.todos.find((t) => t.title === $(".item .title-input").value);
+      const before = changes;
+      check("an open item offers Move to Work", $(".item-move")?.textContent === "Move to Work");
+      $(".item-move").click();
+      check("Move to Work puts the item at the end of the work list", state.workTodos.at(-1) === moving && !state.todos.includes(moving));
+      check("the move saves once and returns to the list", changes === before + 1 && $(".todo-add") && !$(".item"));
+      check("the moved item is gone from this list", !openRows().some((r) => r.dataset.id === moving.id));
+
+      view.dataset.tab = "work";
+      renderTodo(view, state, () => changes++, { tab: "work", list: "workTodos", moveTo: { list: "todos", label: "Move to To-Do" } });
+      $(".item-back")?.click();
+      check("the moved item shows in the Work list", openRows().some((r) => r.dataset.id === moving.id));
+      openRows().find((r) => r.dataset.id === moving.id).querySelector(".todo-open").click();
+      check("there it offers Move to To-Do", $(".item-move")?.textContent === "Move to To-Do");
+      $(".item-move").click();
+      check("Move to To-Do puts it back", state.todos.at(-1) === moving && !state.workTodos.includes(moving));
+      view.dataset.tab = "todo";
     }
   } catch (e) {
     failures.push(`FAIL test page crashed: ${e}${e?.stack ? `\n${e.stack}` : ""}`);
