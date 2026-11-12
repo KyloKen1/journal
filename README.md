@@ -2,8 +2,8 @@
 ## Status
 **Phase:** Playable
 **Focus:** No
-**Summary:** Personal to-do list, wishlist and private book notes as a web page for PC and phone, with data in a private GitHub repo and Claude suggestions on to-dos each weekday morning.
-**Last updated:** 2026-11-11
+**Summary:** Personal and work to-do lists, wishlist and private book notes as a web page for PC and phone, with data in a private GitHub repo and Claude suggestions on to-dos each weekday morning.
+**Last updated:** 2026-11-12
 
 ### Milestones
 - [x] Design spec approved
@@ -17,15 +17,16 @@
 - [x] Page live on GitHub Pages with data in a private repo
 - [x] Tests run before every publish
 - [x] Books tab for books read
+- [x] Drag-to-reorder and a separate Work list
 - [ ] Token set up and checked on PC and phone
 - [ ] Used day to day for a week
 
 ### Last session
-Reviewed the whole project and fixed three findings (tests now run before publishing, a missing data file is no longer reported as a bad token, a background refresh can't roll the page back). Added a Books tab (title, author, percentage read with a progress bar, finished date, liked, disliked) saved to its own `books.json` that Claude's tools refuse to open.
+Made to-do items draggable into any order (mouse, finger or arrow keys on the ⠿ handle). Added a Work tab that is a copy of To-Do on its own list, covered by the morning suggestions, with a button inside each item to move it between the two lists.
 
 ### Next steps
-1. Create the access token and check the live page, including the Books tab, on PC and phone (#12)
-2. Use the to-do list on PC and phone for a week and list changes (#14)
+1. Create the access token and check the live page, including the Work and Books tabs, on PC and phone (#12)
+2. Use the to-do lists on PC and phone for a week, including dragging with a finger, and list changes (#14)
 3. Check wishlist dragging on the phone; add buttons if it doesn't work (#21)
 
 ### Blockers
