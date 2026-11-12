@@ -36,7 +36,8 @@ The page needs your GitHub access token on each device before it shows the list 
 
 A personal to-do list and wishlist that runs in the browser, on any device.
 
-- **To-Do:** one running list. Tick an item to move it to the Completed archive; anything unfinished is still there tomorrow, tagged "carried over". Open an item to see its description, up next steps, a dated progress log and Claude's suggestions on one screen.
+- **To-Do:** one running list. Drag an item by its ⠿ handle to put the list in the order you want (arrow up and down on the handle work too). Tick an item to move it to the Completed archive; anything unfinished is still there tomorrow, tagged "carried over". Open an item to see its description, up next steps, a dated progress log and Claude's suggestions on one screen.
+- **Work:** a second list for work, kept apart from To-Do and working the same way.
 - **Wishlist:** things to buy, ranked by dragging, with prices in rand.
 - **Books:** the books you are reading or have read, each with a bar showing how far through you are, and what you liked and what you disliked. These notes are private: they are kept in their own file (`books.json`) that Claude's skills and tools never open.
 
@@ -59,7 +60,7 @@ The token is kept in that browser only and sent only to GitHub. One limit: brows
 
 ## Claude's suggestions
 
-- **To-Do:** every weekday at 08:00 a scheduled task in the Claude desktop app checks the list and posts up to two suggestions per open item: a next step, a way to split a big task, or a flag on an item with no progress for 5 days. Open the item to **Add to Up next** or **Dismiss**. Say **"check my to-do list"** in a Claude session in this folder to run it on request. It only runs while this PC is on with the Claude app open, and Claude never edits your items.
+- **To-Do and Work:** every weekday at 08:00 a scheduled task in the Claude desktop app checks both lists and posts up to two suggestions per open item: a next step, a way to split a big task, or a flag on an item with no progress for 5 days. Open the item to **Add to Up next** or **Dismiss**. Say **"check my to-do list"** in a Claude session in this folder to run it on request. It only runs while this PC is on with the Claude app open, and Claude never edits your items.
 - **Wishlist:** say **"update my wishlist"**. Claude asks what you want for each item and your budget (saved as `Want:` / `Budget:` lines at the top of the item's notes), then searches South African shops and posts 2–3 options per item to **Accept** or **Dismiss all**. Nothing is bought or ordered.
 
 ## Develop

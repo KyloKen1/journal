@@ -76,6 +76,8 @@ def validate(path: str, data) -> None:
     if path == "journal.json":
         if not (isinstance(data, dict) and isinstance(data.get("todos"), list) and isinstance(data.get("wishlist"), list)):
             raise ValueError("journal.json needs a list of todos and a list of wishlist items")
+        if not isinstance(data.get("workTodos", []), list):
+            raise ValueError("journal.json: workTodos must be a list")
     elif path == "suggestions.json":
         if not (isinstance(data, dict) and isinstance(data.get("items"), dict) and isinstance(data.get("todos"), dict)):
             raise ValueError("suggestions.json needs an items object and a todos object")

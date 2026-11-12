@@ -104,7 +104,7 @@ main { padding: 20px; }
 ul, ol { list-style: none; margin: 0; padding: 0; }
 h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 24px 0 8px; }
 
-/* To-Do tab: the list */
+/* To-Do and Work tabs: the list */
 .todo-list { max-width: 900px; display: flex; flex-direction: column; gap: 12px; }
 .todo-add { padding: 10px 12px !important; }
 .todo-rows, .completed ul { display: flex; flex-direction: column; gap: 6px; }
@@ -118,6 +118,10 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
   border-radius: var(--radius);
 }
 .todo-row:hover { border-color: var(--accent); }
+.todo-row:has(.handle) { padding-left: 0; }
+.todo-row .handle { align-self: stretch; flex: none; min-width: 36px; border: none; background: transparent; touch-action: none; }
+.todo-row .handle:active { cursor: grabbing; }
+.todo-row.dragging { border-color: var(--accent); box-shadow: 0 4px 14px rgb(0 0 0 / 0.18); position: relative; z-index: 1; }
 .todo-row input[type="checkbox"], .item-check { width: 20px; height: 20px; flex: none; accent-color: var(--accent); cursor: pointer; }
 .todo-open {
   flex: 1;
@@ -147,7 +151,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
 .completed summary { cursor: pointer; color: var(--muted); font-weight: 600; padding: 6px 2px; }
 .completed ul { margin-top: 6px; }
 
-/* To-Do tab: one item, filling the window */
+/* To-Do and Work tabs: one item, filling the window */
 .item { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr); gap: 16px; }
 .item-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .item-head .title-input { flex: 1; min-width: 0; text-overflow: ellipsis; }
@@ -177,9 +181,9 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
 
 @media (min-width: 901px) {
   /* The open item is exactly as tall as the window: sections scroll inside, the page does not. */
-  body:has(main[data-tab="todo"][data-mode="item"]) { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-  main[data-tab="todo"][data-mode="item"] { flex: 1; min-height: 0; }
-  main[data-tab="todo"][data-mode="item"] .item { height: 100%; }
+  body:has(main:is([data-tab="todo"], [data-tab="work"])[data-mode="item"]) { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+  main:is([data-tab="todo"], [data-tab="work"])[data-mode="item"] { flex: 1; min-height: 0; }
+  main:is([data-tab="todo"], [data-tab="work"])[data-mode="item"] .item { height: 100%; }
 }
 
 @media (max-width: 900px) {

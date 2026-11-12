@@ -21,11 +21,12 @@
     });
     const state = {
       todos: [
-        todo("new", "Added today", 0),
         todo("old", "Three days old", 3, { upNext: [{ id: "s1", text: "First step" }, { id: "s2", text: "Second step" }] }),
+        todo("new", "Added today", 0),
         todo("done1", "Finished earlier", 9, { completed: true, completedDate: "2026-11-01" }),
         todo("done2", "Finished later", 9, { completed: true, completedDate: "2026-11-05" }),
       ],
+      workTodos: [],
       wishlist: [],
       suggestions: {},
       todoSuggestions: {
@@ -61,7 +62,7 @@
     renderTodo(view, state, () => changes++);
 
     // List
-    check("open items are listed oldest first", openRows().map((r) => r.querySelector(".todo-title").textContent).join("|") === "Three days old|Added today");
+    check("open items are listed in their saved order", openRows().map((r) => r.querySelector(".todo-title").textContent).join("|") === "Three days old|Added today");
     check("an older item is tagged carried over", openRows()[0].querySelector(".todo-tag")?.textContent === "carried over · 3 days");
     check("an item added today has no tag", !openRows()[1].querySelector(".todo-tag"));
     check("a row shows the first up-next step", openRows()[0].textContent.includes("First step"));
@@ -70,6 +71,44 @@
     check("the archive counts completed items", $("details.completed summary").textContent === "Completed (2)");
     check("completed items are newest first with their date", doneRows().map((r) => r.querySelector(".todo-title").textContent).join("|") === "Finished later|Finished earlier" && doneRows()[0].textContent.includes("2026-11-05"));
     check("completed items show no suggestion badge", !doneRows().some((r) => r.querySelector(".badge")));
+
+    // Reorder
+    {
+      const titles = () => openRows().map((r) => r.querySelector(".todo-title").textContent).join("|");
+      const saved = () => state.todos.filter((t) => !t.completed).map((t) => t.id).join("|");
+      const handle = (n) => openRows()[n].querySelector(".handle");
+      const press = (el, key) => el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+      const pointer = (target, kind, y) => target.dispatchEvent(new PointerEvent(kind, { bubbles: true, button: 0, pointerId: 1, isPrimary: true, clientX: 10, clientY: y }));
+      const middle = (n) => { const r = openRows()[n].getBoundingClientRect(); return (r.top + r.bottom) / 2; };
+      const drag = (from, toY) => {
+        pointer(handle(from), "pointerdown", middle(from));
+        pointer(window, "pointermove", toY);
+        pointer(window, "pointerup", toY);
+      };
+
+      check("every open row has a handle to move it", openRows().every((r) => r.querySelector(".handle")));
+      check("completed rows have no handle", !doneRows().some((r) => r.querySelector(".handle")));
+
+      press(handle(0), "ArrowDown");
+      check("arrow down on a handle moves the item down and saves", titles() === "Added today|Three days old" && saved() === "new|old" && changes === 1);
+      check("the moved item's handle keeps focus", document.activeElement === handle(1));
+      press(handle(1), "ArrowDown");
+      check("arrow down on the last item does nothing", saved() === "new|old" && changes === 1);
+      press(handle(1), "ArrowUp");
+      check("arrow up moves the item back up", titles() === "Three days old|Added today" && saved() === "old|new" && changes === 2);
+      press(handle(0), "ArrowUp");
+      check("arrow up on the first item does nothing", saved() === "old|new" && changes === 2);
+
+      drag(0, openRows()[1].getBoundingClientRect().bottom + 5);
+      check("dragging a handle below the next item moves it down and saves", titles() === "Added today|Three days old" && saved() === "new|old" && changes === 3);
+      drag(1, openRows()[0].getBoundingClientRect().top - 5);
+      check("dragging a handle above the previous item moves it up", titles() === "Three days old|Added today" && saved() === "old|new" && changes === 4);
+      drag(0, middle(0) + 1);
+      check("a drag that ends where it began saves nothing", saved() === "old|new" && changes === 4);
+      check("completed items stay in the saved list after a move", state.todos.length === 4);
+      check("a drag does not open the item", Boolean($(".todo-add")) && !$(".item"));
+      changes = 0;
+    }
 
     // Add
     type($(".todo-add"), "   ");
@@ -163,6 +202,26 @@
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     check("Esc does nothing while another tab is showing", Boolean($(".item")));
     view.dataset.tab = "todo";
+
+    // The Work tab: the same screen on its own list
+    {
+      const todosBefore = state.todos.length;
+      const before = changes;
+      view.dataset.tab = "work";
+      renderTodo(view, state, () => changes++, { tab: "work", list: "workTodos" });
+      check("the Work tab opens on its own empty list, not the item open in To-Do", $(".todo-add") && !$(".item") && openRows().length === 0);
+      type($(".todo-add"), "Send the report");
+      enter($(".todo-add"));
+      check("an item added there goes to the work list only", state.workTodos.length === 1 && state.workTodos[0].title === "Send the report" && state.todos.length === todosBefore && changes === before + 1);
+      openRows()[0].querySelector(".todo-open").click();
+      check("a work item opens", $(".item .title-input")?.value === "Send the report");
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      check("Esc closes a work item", $(".todo-add") && !$(".item"));
+      openRows()[0].querySelector(".todo-open").click();
+      view.dataset.tab = "todo";
+      renderTodo(view, state, () => changes++);
+      check("going back to To-Do shows the item that was open there", $(".item") && $(".item .title-input").value !== "Send the report");
+    }
   } catch (e) {
     failures.push(`FAIL test page crashed: ${e}${e?.stack ? `\n${e.stack}` : ""}`);
   }

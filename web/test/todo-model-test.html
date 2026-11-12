@@ -38,9 +38,14 @@
       const n = m.normalizeJournal({ version: 7, issues: [issue()], wishlist: [w] });
       check("old shape converts issues to todos", n.todos.length === 1 && n.todos[0].description === "D");
       check("old shape keeps the wishlist", same(n.wishlist, [w]));
-      check("old shape drops version and issues", same(Object.keys(n).sort(), ["todos", "wishlist"]));
-      const current = { todos: [{ id: "t" }], wishlist: [] };
-      check("current shape passes through", same(m.normalizeJournal(current), current));
+      check("old shape drops version and issues", same(Object.keys(n).sort(), ["todos", "wishlist", "workTodos"]));
+      check("old shape gets an empty work list", same(n.workTodos, []));
+      const current = { todos: [{ id: "t", created: "2026-11-10T09:00:00" }, { id: "s", created: "2026-11-01T09:00:00" }], workTodos: [{ id: "w" }], wishlist: [] };
+      check("current shape passes through in its saved order", same(m.normalizeJournal(current), current) && m.normalizeJournal(current).todos === current.todos);
+      const before = m.normalizeJournal({ todos: current.todos, wishlist: [] });
+      check("a file from before the work list gets an empty one", same(before.workTodos, []));
+      check("a file from before dragging keeps the oldest-first order it was shown in", same(before.todos.map((t) => t.id), ["s", "t"]));
+      check("non-list work todos throws", throws(() => m.normalizeJournal({ todos: [], workTodos: "x", wishlist: [] })));
       check("null journal throws", throws(() => m.normalizeJournal(null)));
       check("empty object journal throws", throws(() => m.normalizeJournal({})));
       check("non-list todos throws", throws(() => m.normalizeJournal({ todos: "x", wishlist: [] })));
@@ -81,8 +86,24 @@
         { id: "c", completed: false, created: "2026-11-11T09:00:00" },
         { id: "y", completed: true, completedDate: "2026-11-07" },
       ];
-      check("open todos are oldest first", same(m.openTodos(todos).map((t) => t.id), ["a", "b", "c"]));
+      check("open todos keep the list's own order", same(m.openTodos(todos).map((t) => t.id), ["b", "a", "c"]));
       check("completed todos are newest first", same(m.completedTodos(todos).map((t) => t.id), ["z", "y", "x"]));
+    }
+
+    // moveTodo
+    {
+      const list = () => ["a", "x", "b", "c"].map((id) => ({ id, completed: id === "x" }));
+      const ids = (todos) => todos.map((t) => t.id).join("");
+      let t = list();
+      check("moveTodo puts an item before another", m.moveTodo(t, "c", "a") === true && ids(t) === "caxb");
+      t = list();
+      check("moveTodo moves an item down", m.moveTodo(t, "a", "c") === true && ids(t) === "xbac");
+      t = list();
+      check("moveTodo with no target moves to the end", m.moveTodo(t, "a", null) === true && ids(t) === "xbca");
+      t = list();
+      check("moveTodo before itself changes nothing", m.moveTodo(t, "b", "b") === false && ids(t) === "axbc");
+      check("moveTodo to where it already is reports no change", m.moveTodo(t, "b", "c") === false && m.moveTodo(t, "c", null) === false && ids(t) === "axbc");
+      check("moveTodo of an unknown item changes nothing", m.moveTodo(t, "nope", "a") === false && ids(t) === "axbc");
     }
 
     // complete / reopen

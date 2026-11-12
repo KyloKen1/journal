@@ -1,14 +1,15 @@
-// The To-Do tab: a running list with a Completed archive, and a full-window view of one item.
+// The To-Do and Work tabs: a running list with a Completed archive, and a full-window view of one item.
+// Both tabs are this one screen, each on its own list.
 import { el } from "./dom.js";
 import { newId, nowISO, todayISO } from "./format.js";
 import { dismissTodoSuggestion, formatCheckedDate, todoAcceptedQueue } from "./suggest.js";
 import {
   applySuggestion, carriedOverDays, completeStep, completeTodo, completedTodos, dismissSuggestion,
-  newTodo, openTodos, pendingSuggestions, reopenTodo,
+  moveTodo, newTodo, openTodos, pendingSuggestions, reopenTodo,
 } from "./todo-model.js";
 
-// Which item is open survives switching tabs, but not a page reload.
-let openId = null;
+// Which item is open in each list survives switching tabs, but not a page reload.
+const openIds = {};
 // Set while an item is open, so Esc can close it.
 let closeOpenItem = null;
 
@@ -24,8 +25,10 @@ const carriedTag = (todo) => {
 const removeButton = (onclick) =>
   el("button", { type: "button", class: "remove", title: "Remove", "aria-label": "Remove", onclick }, "×");
 
-export function renderTodo(root, state, changed) {
-  const showing = () => root.isConnected && root.dataset.tab === "todo";
+// tab is the tab's name in the page; list is the name of its list in the saved data.
+export function renderTodo(root, state, changed, { tab = "todo", list = "todos" } = {}) {
+  const showing = () => root.isConnected && root.dataset.tab === tab;
+  const todos = () => state[list];
 
   function touch(todo) {
     todo.updated = nowISO();
@@ -33,27 +36,27 @@ export function renderTodo(root, state, changed) {
   }
 
   function draw() {
-    const todo = state.todos.find((t) => t.id === openId);
+    const todo = todos().find((t) => t.id === openIds[list]);
     closeOpenItem = null;
     if (todo) drawItem(todo);
     else drawList();
   }
 
   function open(id) {
-    openId = id;
+    openIds[list] = id;
     draw();
   }
 
   // ---- List ----
 
   function drawList() {
-    openId = null;
+    openIds[list] = null;
     root.dataset.mode = "list";
 
     function add(input) {
       const title = input.value.trim();
       if (!title) return;
-      state.todos.push(newTodo(title, nowISO()));
+      todos().push(newTodo(title, nowISO()));
       changed();
       draw();
       root.querySelector(".todo-add").focus();
@@ -71,7 +74,13 @@ export function renderTodo(root, state, changed) {
 
     function row(todo) {
       const waiting = pendingSuggestions(todo, state.todoSuggestions).length;
-      return el("li", { class: todo.completed ? "todo-row is-completed" : "todo-row" },
+      const li = el("li", { class: todo.completed ? "todo-row is-completed" : "todo-row", "data-id": todo.id },
+        !todo.completed && el("button", {
+          type: "button", class: "handle", title: "Drag to move, or use the arrow keys",
+          "aria-label": `Move ${todo.title || "Untitled"}: drag, or press arrow up or down`,
+          onpointerdown: (e) => startDrag(e, li, todo),
+          onkeydown: (e) => nudge(e, todo),
+        }, "⠿"),
         el("input", {
           type: "checkbox", checked: todo.completed,
           title: todo.completed ? "Move back to the list" : "Mark completed",
@@ -87,10 +96,60 @@ export function renderTodo(root, state, changed) {
           todo.completed && el("span", { class: "todo-date" }, todo.completedDate ?? ""),
         ),
       );
+      return li;
     }
 
-    const active = openTodos(state.todos);
-    const finished = completedTodos(state.todos);
+    // Dragging a handle, with the mouse or a finger. The neighbours step around the dragged
+    // row, which itself never leaves the page, so the drag is not cut short.
+    function startDrag(e, li, todo) {
+      if (e.button !== 0) return;
+      e.preventDefault(); // no text selection while dragging
+      const rows = li.parentElement;
+      const middle = (row) => { const r = row.getBoundingClientRect(); return (r.top + r.bottom) / 2; };
+      li.classList.add("dragging");
+
+      function onMove(ev) {
+        let other;
+        while ((other = li.previousElementSibling) && ev.clientY < middle(other)) li.after(other);
+        while ((other = li.nextElementSibling) && ev.clientY > middle(other)) li.before(other);
+      }
+
+      function onEnd(ev) {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onEnd);
+        window.removeEventListener("pointercancel", onEnd);
+        const shown = [...rows.children].map((r) => r.dataset.id).join("\n");
+        const moved = shown !== openTodos(todos()).map((t) => t.id).join("\n");
+        if (moved && ev.type === "pointerup") {
+          moveTodo(todos(), todo.id, li.nextElementSibling?.dataset.id ?? null);
+          changed();
+        }
+        if (showing() && root.dataset.mode === "list") draw();
+      }
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onEnd);
+      window.addEventListener("pointercancel", onEnd);
+    }
+
+    // Arrow up or down on a handle moves the item one place.
+    function nudge(e, todo) {
+      const step = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      const open = openTodos(todos());
+      const target = open.indexOf(todo) + step;
+      if (target < 0 || target >= open.length) return;
+      // Up: land before the item above. Down: before the one after the item below, or at the end.
+      const before = step < 0 ? open[target] : open[target + 1];
+      moveTodo(todos(), todo.id, before?.id ?? null);
+      changed();
+      draw();
+      [...root.querySelectorAll(".todo-rows > .todo-row")].find((r) => r.dataset.id === todo.id)?.querySelector(".handle").focus();
+    }
+
+    const active = openTodos(todos());
+    const finished = completedTodos(todos());
     root.replaceChildren(
       el("div", { class: "todo-list" },
         el("input", {
@@ -239,7 +298,7 @@ export function renderTodo(root, state, changed) {
 
     function remove() {
       if (!confirm("Delete this item? This can't be undone.")) return;
-      state.todos.splice(state.todos.indexOf(todo), 1);
+      todos().splice(todos().indexOf(todo), 1);
       changed();
       open(null);
     }

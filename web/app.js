@@ -22,8 +22,9 @@ const RETRY_LOAD_MS = 10000;
 // sha is the version of journal.json this page last loaded or saved.
 // Suggestions are Claude's, kept in their own file; the saver never sends them.
 // Books live in their own file (booksSha is its version; null until the file exists).
-const state = { sha: null, todos: [], wishlist: [], suggestions: {}, todoSuggestions: {}, books: [], booksSha: null };
-const tabs = { todo: renderTodo, wishlist: renderWishlist, books: renderBooks };
+const state = { sha: null, todos: [], workTodos: [], wishlist: [], suggestions: {}, todoSuggestions: {}, books: [], booksSha: null };
+const renderWork = (root, state, changed) => renderTodo(root, state, changed, { tab: "work", list: "workTodos" });
+const tabs = { todo: renderTodo, work: renderWork, wishlist: renderWishlist, books: renderBooks };
 let currentTab = "todo";
 let loaded = false;
 
@@ -40,7 +41,7 @@ initSuggestions(createSuggestionStore({ storage, path: SUGGESTIONS_PATH }));
 const files = createDirtySave(storage, {
   journal: {
     path: JOURNAL_PATH,
-    data: () => ({ todos: state.todos, wishlist: state.wishlist }),
+    data: () => ({ todos: state.todos, workTodos: state.workTodos, wishlist: state.wishlist }),
     getSha: () => state.sha,
     setSha: (sha) => { state.sha = sha; },
   },
@@ -104,7 +105,7 @@ function show(tab) {
   }
   if (!loaded) return; // never let edits happen on placeholder data
   view.replaceChildren();
-  delete view.dataset.mode; // the To-Do tab sets it again; other tabs must not inherit its layout
+  delete view.dataset.mode; // the To-Do and Work tabs set it again; other tabs must not inherit its layout
   view.dataset.tab = tab;
   tabs[tab](view, state, tab === "books" ? booksChanged : journalChanged);
 }
@@ -177,7 +178,7 @@ async function start() {
   }
   const suggestions = await loadSuggestions();
   Object.assign(state, {
-    sha: file.sha, todos: journal.todos, wishlist: journal.wishlist,
+    sha: file.sha, todos: journal.todos, workTodos: journal.workTodos, wishlist: journal.wishlist,
     suggestions: suggestions.items, todoSuggestions: suggestions.todos,
     books: books.books, booksSha: books.sha,
   });
@@ -185,7 +186,7 @@ async function start() {
   statusEl.textContent = "Saved";
   loaded = true;
   show(currentTab);
-  // First load of the old Work-card file: save it back in the to-do shape.
+  // First load of a file in an older shape: save it back in the current one.
   if (journal.todos !== file.data.todos) journalChanged();
 }
 
@@ -218,7 +219,7 @@ async function refreshIfStale() {
     const booksMoved = books.sha !== state.booksSha;
     if ((journalMoved || suggestionsMoved || booksMoved) && saver.isIdle()) {
       if (booksMoved) Object.assign(state, { books: books.books, booksSha: books.sha });
-      if (journalMoved) Object.assign(state, { sha: file.sha, todos: journal.todos, wishlist: journal.wishlist });
+      if (journalMoved) Object.assign(state, { sha: file.sha, todos: journal.todos, workTodos: journal.workTodos, wishlist: journal.wishlist });
       Object.assign(state, { suggestions: suggestions.items, todoSuggestions: suggestions.todos });
       show(currentTab);
     }

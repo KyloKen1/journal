@@ -165,7 +165,9 @@ class ValidateTests(unittest.TestCase):
 
     def test_journal_needs_both_lists(self):
         data.validate("journal.json", {"todos": [], "wishlist": []})
-        for bad in ({"todos": []}, {"wishlist": []}, {"todos": {}, "wishlist": []}, [], None):
+        data.validate("journal.json", {"todos": [], "workTodos": [], "wishlist": []})
+        for bad in ({"todos": []}, {"wishlist": []}, {"todos": {}, "wishlist": []},
+                    {"todos": [], "workTodos": {}, "wishlist": []}, [], None):
             with self.assertRaises(ValueError):
                 data.validate("journal.json", bad)
 

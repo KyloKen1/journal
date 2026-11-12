@@ -6,6 +6,7 @@
 <header>
   <nav>
     <button type="button" data-tab="todo">To-Do</button>
+    <button type="button" data-tab="work">Work</button>
     <button type="button" data-tab="wishlist">Wishlist</button>
     <button type="button" data-tab="books">Books</button>
   </nav>
@@ -34,7 +35,7 @@
     const toBase64 = (text) => btoa(String.fromCharCode(...new TextEncoder().encode(text)));
     const fromBase64 = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
     const repo = {
-      "journal.json": { sha: "j1", text: JSON.stringify({ todos: [{ id: "t1", title: "Existing to-do", description: "", upNext: [], progress: [], completed: false, completedDate: null, created: "2026-11-11T08:00:00", updated: "2026-11-11T08:00:00" }], wishlist: [] }) },
+      "journal.json": { sha: "j1", text: JSON.stringify({ todos: [{ id: "t1", title: "Existing to-do", description: "", upNext: [], progress: [], completed: false, completedDate: null, created: "2026-11-11T08:00:00", updated: "2026-11-11T08:00:00" }], workTodos: [], wishlist: [] }) },
       "suggestions.json": { sha: "s1", text: JSON.stringify({ items: {}, todos: {} }) },
     };
     const puts = [];
@@ -85,6 +86,13 @@
     view.querySelector(".todo-add").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     hidePage();
     check("a to-do edit saves journal.json only, without the books", await until(() => puts.length === 3) && puts[2].path === "journal.json" && puts[2].sha === "j1" && !("books" in puts[2].data) && puts[2].data.todos.length === 2);
+
+    document.querySelector('[data-tab="work"]').click();
+    check("the Work tab opens on its own empty list", view.querySelector(".todo-add") && !view.textContent.includes("Existing to-do"));
+    type(view.querySelector(".todo-add"), "Work item");
+    view.querySelector(".todo-add").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    hidePage();
+    check("a work item is saved in journal.json beside the to-dos", await until(() => puts.length === 4) && puts[3].path === "journal.json" && puts[3].data.workTodos?.[0]?.title === "Work item" && puts[3].data.todos.length === 2);
 
     document.querySelector('[data-tab="books"]').click();
     check("the book is still there after switching tabs", view.querySelector(".book-title")?.textContent === "Dune");

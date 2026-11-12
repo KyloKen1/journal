@@ -23,12 +23,20 @@ export function convertIssue(issue) {
   };
 }
 
+const byCreated = (a, b) => String(a.created ?? "").localeCompare(String(b.created ?? ""));
+
 // Accepts the current file shape or the old one (issues + version). Throws for anything
 // else, so a file we don't understand is never shown as an empty list and saved over.
 export function normalizeJournal(data) {
   if (!isObject(data) || !Array.isArray(data.wishlist)) throw new Error("journal data is not readable");
-  if (Array.isArray(data.todos)) return { todos: data.todos, wishlist: data.wishlist };
-  if (Array.isArray(data.issues)) return { todos: data.issues.map(convertIssue), wishlist: data.wishlist };
+  const { wishlist } = data;
+  if (Array.isArray(data.todos)) {
+    if (Array.isArray(data.workTodos)) return { todos: data.todos, workTodos: data.workTodos, wishlist };
+    if (data.workTodos !== undefined) throw new Error("journal data is not readable");
+    // A file from before items could be dragged: the list was shown oldest first, so it starts out that way.
+    return { todos: [...data.todos].sort(byCreated), workTodos: [], wishlist };
+  }
+  if (Array.isArray(data.issues)) return { todos: data.issues.map(convertIssue).sort(byCreated), workTodos: [], wishlist };
   throw new Error("journal data is not readable");
 }
 
@@ -57,8 +65,21 @@ export function carriedOverDays(todo, today) {
   return Math.max(0, Math.round((localDate(today) - localDate(todo.created)) / DAY_MS));
 }
 
+// In the list's own order, which the owner sets by dragging.
 export function openTodos(todos) {
-  return todos.filter((t) => !t.completed).sort((a, b) => a.created.localeCompare(b.created));
+  return todos.filter((t) => !t.completed);
+}
+
+// Moves the item to just before another one, or to the end when beforeId is null.
+// False if that leaves the list as it was.
+export function moveTodo(todos, id, beforeId) {
+  const from = todos.findIndex((t) => t.id === id);
+  if (from < 0 || id === beforeId) return false;
+  const order = todos.map((t) => t.id).join("\n");
+  const [todo] = todos.splice(from, 1);
+  const to = beforeId == null ? -1 : todos.findIndex((t) => t.id === beforeId);
+  todos.splice(to < 0 ? todos.length : to, 0, todo);
+  return todos.map((t) => t.id).join("\n") !== order;
 }
 
 export function completedTodos(todos) {
