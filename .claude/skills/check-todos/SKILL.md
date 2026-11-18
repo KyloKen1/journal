@@ -54,6 +54,7 @@ Rules:
 - Only use what the item says. Do not invent requirements, deadlines, prices or people.
 - `text` is one plain sentence, at most about 120 characters. Each step is a short action starting with a verb, at most about 80 characters.
 - Steps must not repeat anything already in `upNext` or `progress`.
+- **Work list context:** the owner's work software is **ManageEngine** products, mostly **Endpoint Central**. For items in `workTodos`, assume tasks happen in those tools unless the item says otherwise, and word suggestions to fit them (for example "Ask Claude to write the Endpoint Central steps to deploy …", a configuration or patch-deployment checklist, a custom script for Endpoint Central to run). Do not suggest switching to other tools. Do not apply this to the personal To-Do list.
 
 ## 4. Write the entries
 
