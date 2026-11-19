@@ -9,6 +9,7 @@
     <button type="button" data-tab="work">Work</button>
     <button type="button" data-tab="wishlist">Wishlist</button>
     <button type="button" data-tab="books">Books</button>
+    <button type="button" data-tab="workout">Workout</button>
   </nav>
   <span id="status"></span>
   <button type="button" id="forget" hidden></button>
@@ -99,6 +100,16 @@
     view.querySelector(".item-move").click();
     hidePage();
     check("moving a to-do to Work saves it in the work list", await until(() => puts.length === 5) && puts[4].data.workTodos.map((t) => t.title).join("|") === "Work item|Existing to-do" && puts[4].data.todos.length === 1);
+
+    document.querySelector('[data-tab="workout"]').click();
+    check("the Workout tab opens empty", /No workouts logged yet/.test(view.textContent));
+    view.querySelector(".workout-start").click();
+    type(view.querySelector(".set-weight"), "16");
+    type(view.querySelector(".set-reps"), "10");
+    hidePage();
+    check("a logged workout is saved to workouts.json only, created without a version",
+      await until(() => puts.length === 6) && puts[5].path === "workouts.json" && puts[5].sha === undefined &&
+      puts[5].data.sessions[0].workout === "A" && puts[5].data.sessions[0].exercises[0].sets[0].weight === 16 && puts[5].data.sessions[0].exercises[0].sets[0].reps === 10);
 
     document.querySelector('[data-tab="books"]').click();
     check("the book is still there after switching tabs", view.querySelector(".book-title")?.textContent === "Dune");

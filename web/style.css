@@ -326,7 +326,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
 .book-editor textarea { resize: vertical; }
 .tabs button { white-space: nowrap; }
 @media (max-width: 700px) {
-  /* Three tabs don't fit beside the title on a phone: give them their own row. */
+  /* The tabs do not fit beside the title on a phone: give them their own row. */
   .topbar { flex-wrap: wrap; gap: 6px 12px; padding: 8px 12px; }
   .tabs { order: 5; flex-basis: 100%; }
   .book-editor { grid-template-columns: 1fr; }
@@ -337,3 +337,54 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
   .book-percent-slider { min-height: 44px; }
 }
 .toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+
+/* Workout tab */
+.workout { max-width: 900px; }
+.workout-header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 12px; }
+.workout-count { margin-left: auto; font-size: 13px; }
+.workout-section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 10px; }
+.workout-section summary { cursor: pointer; font-weight: 600; }
+.workout-section[open] summary { margin-bottom: 8px; }
+.plan-rules { list-style: disc; padding-left: 20px; margin: 0 0 12px; font-size: 14px; }
+.plan-rules li { margin-bottom: 4px; }
+.plan-workouts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.plan-workout h4 { margin: 0 0 6px; }
+.plan-table, .progress-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.plan-table td, .progress-table td, .progress-table th { padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: top; text-align: left; }
+.progress-table th { font-size: 12px; color: var(--muted); font-weight: 600; border-top: none; }
+.plan-gear { font-size: 12px; }
+.num { text-align: right !important; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.session-items { display: flex; flex-direction: column; gap: 6px; }
+.session { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.session.open { border-color: var(--accent); }
+.session-row { width: 100%; display: flex; align-items: baseline; gap: 12px; text-align: left; border: none; background: transparent; padding: 10px 12px; }
+.session-date { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.session-name { flex: 1 1 0; min-width: 0; }
+.session-summary { flex: none; font-size: 12px; }
+.session-editor { display: flex; flex-direction: column; gap: 14px; padding: 4px 16px 16px; }
+.session-date-field { max-width: 12em; }
+.session-editor textarea { resize: vertical; }
+.session-editor .actions { margin-top: 0; }
+.exercise { border-top: 1px solid var(--line); padding-top: 12px; }
+.exercise-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.exercise-name { font-weight: 600; }
+.exercise-target { font-size: 13px; font-variant-numeric: tabular-nums; }
+.exercise-last { margin: 4px 0 0; font-size: 13px; }
+.exercise-advice { margin: 4px 0 8px; font-size: 13px; padding: 4px 8px; border-radius: var(--radius); display: inline-block; }
+.advice-heavier { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.advice-same, .advice-start { background: var(--bg); }
+.set-rows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.set-row { display: flex; align-items: center; gap: 8px; }
+.set-label { width: 3.5em; flex: none; font-size: 13px; }
+.set-input { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.set-input input { width: 4.5em; text-align: right; font-variant-numeric: tabular-nums; }
+.set-add { font-size: 13px; padding: 4px 10px; }
+@media (max-width: 700px) {
+  .tabs { overflow-x: auto; }
+  .tabs button { padding-left: 8px; padding-right: 8px; }
+  .workout-count { margin-left: 0; flex-basis: 100%; }
+  .plan-workouts { grid-template-columns: 1fr; }
+  .session-row { flex-wrap: wrap; row-gap: 0; }
+  .session-summary { flex-basis: 100%; }
+  .set-input input { min-height: 40px; }
+}

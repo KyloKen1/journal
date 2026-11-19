@@ -2,8 +2,8 @@
 ## Status
 **Phase:** Playable
 **Focus:** No
-**Summary:** Personal and work to-do lists, wishlist and private book notes as a web page for PC and phone, with data in a private GitHub repo and Claude suggestions on to-dos each weekday morning.
-**Last updated:** 2026-11-12
+**Summary:** Personal and work to-do lists, wishlist, private book notes and a workout tracker as a web page for PC and phone, with data in a private GitHub repo and Claude suggestions on to-dos each weekday morning.
+**Last updated:** 2026-11-19
 
 ### Milestones
 - [x] Design spec approved
@@ -18,16 +18,17 @@
 - [x] Tests run before every publish
 - [x] Books tab for books read
 - [x] Drag-to-reorder and a separate Work list
+- [x] Workout tab with a routine and a tracker
 - [ ] Token set up and checked on PC and phone
 - [ ] Used day to day for a week
 
 ### Last session
-Made to-do items draggable into any order (mouse, finger or arrow keys on the ⠿ handle). Added a Work tab that is a copy of To-Do on its own list, covered by the morning suggestions, with a button inside each item to move it between the two lists.
+Added a Workout tab: a 3-day full-body routine (Workout A and B, alternated) for dumbbells, barbell and kettlebells. Each session logs weight and reps per set, shows last time's numbers and says when to go heavier. Workouts are saved in their own file, `workouts.json`.
 
 ### Next steps
 1. Create the access token and check the live page, including the Work and Books tabs, on PC and phone (#12)
 2. Use the to-do lists on PC and phone for a week, including dragging with a finger, and list changes (#14)
-3. Check wishlist dragging on the phone; add buttons if it doesn't work (#21)
+3. Do the first two weeks of the workout routine and log every session (#27)
 
 ### Blockers
 The page needs your GitHub access token on each device before it shows the list (#12).
@@ -40,6 +41,7 @@ A personal to-do list and wishlist that runs in the browser, on any device.
 - **To-Do:** one running list. Drag an item by its ⠿ handle to put the list in the order you want (arrow up and down on the handle work too). Tick an item to move it to the Completed archive; anything unfinished is still there tomorrow, tagged "carried over". Open an item to see its description, up next steps, a dated progress log and Claude's suggestions on one screen.
 - **Work:** a second list for work, kept apart from To-Do and working the same way.
 - **Wishlist:** things to buy, ranked by dragging, with prices in rand.
+- **Workout:** a 3-day-a-week full-body routine (Workout A and B, alternated) for dumbbells, a barbell and kettlebells. Tap **Start Workout A/B**, fill in weight and reps for each set as you go, and the tab shows what you did last time. When you reach the top of the rep range on every set, it tells you to go heavier. **The plan** explains the routine, and **Progress** shows each lift's starting and current weight. Saved in its own file, `workouts.json`.
 - **Books:** the books you are reading or have read, each with a bar showing how far through you are, and what you liked and what you disliked. These notes are private: they are kept in their own file (`books.json`) that Claude's skills and tools never open.
 
 ## Use it

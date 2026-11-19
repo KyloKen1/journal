@@ -1,6 +1,6 @@
 import { renderBooks } from "./books.js";
 import { normalizeBooks } from "./books-model.js";
-import { BOOKS_PATH, DATA_REPO, JOURNAL_PATH, SUGGESTIONS_PATH } from "./config.js";
+import { BOOKS_PATH, DATA_REPO, JOURNAL_PATH, SUGGESTIONS_PATH, WORKOUTS_PATH } from "./config.js";
 import { createStorage } from "./github.js";
 import { createDirtySave } from "./journal-save.js";
 import { createSaver } from "./save.js";
@@ -10,6 +10,8 @@ import { normalizeJournal } from "./todo-model.js";
 import { forgetToken, getToken, renderSetup } from "./token.js";
 import { renderTodo } from "./todo.js";
 import { renderWishlist } from "./wishlist.js";
+import { renderWorkout } from "./workout.js";
+import { normalizeWorkouts } from "./workout-model.js";
 
 const OFFLINE = "Not saved — no connection. Retrying.";
 const LOAD_OFFLINE = "Can't reach GitHub — no connection. Retrying.";
@@ -21,13 +23,13 @@ const RETRY_LOAD_MS = 10000;
 
 // sha is the version of journal.json this page last loaded or saved.
 // Suggestions are Claude's, kept in their own file; the saver never sends them.
-// Books live in their own file (booksSha is its version; null until the file exists).
-const state = { sha: null, todos: [], workTodos: [], wishlist: [], suggestions: {}, todoSuggestions: {}, books: [], booksSha: null };
+// Books and workouts each live in their own file (booksSha and workoutsSha are their versions; null until the file exists).
+const state = { sha: null, todos: [], workTodos: [], wishlist: [], suggestions: {}, todoSuggestions: {}, books: [], booksSha: null, sessions: [], workoutsSha: null };
 const renderPersonal = (root, state, changed) =>
   renderTodo(root, state, changed, { moveTo: { list: "workTodos", label: "Move to Work" } });
 const renderWork = (root, state, changed) =>
   renderTodo(root, state, changed, { tab: "work", list: "workTodos", moveTo: { list: "todos", label: "Move to To-Do" } });
-const tabs = { todo: renderPersonal, work: renderWork, wishlist: renderWishlist, books: renderBooks };
+const tabs = { todo: renderPersonal, work: renderWork, wishlist: renderWishlist, books: renderBooks, workout: renderWorkout };
 let currentTab = "todo";
 let loaded = false;
 
@@ -53,6 +55,12 @@ const files = createDirtySave(storage, {
     data: () => ({ books: state.books }),
     getSha: () => state.booksSha,
     setSha: (sha) => { state.booksSha = sha; },
+  },
+  workouts: {
+    path: WORKOUTS_PATH,
+    data: () => ({ sessions: state.sessions }),
+    getSha: () => state.workoutsSha,
+    setSha: (sha) => { state.workoutsSha = sha; },
   },
 });
 
@@ -110,7 +118,7 @@ function show(tab) {
   view.replaceChildren();
   delete view.dataset.mode; // the To-Do and Work tabs set it again; other tabs must not inherit its layout
   view.dataset.tab = tab;
-  tabs[tab](view, state, tab === "books" ? booksChanged : journalChanged);
+  tabs[tab](view, state, tab === "books" ? booksChanged : tab === "workout" ? workoutsChanged : journalChanged);
 }
 
 function journalChanged() {
@@ -123,6 +131,11 @@ function booksChanged() {
   saver.changed();
 }
 
+function workoutsChanged() {
+  files.mark("workouts");
+  saver.changed();
+}
+
 // books.json does not exist until the first book is saved.
 async function loadBooks() {
   try {
@@ -130,6 +143,17 @@ async function loadBooks() {
     return { books: normalizeBooks(file.data), sha: file.sha };
   } catch (error) {
     if (error.kind === "missing") return { books: [], sha: null };
+    throw error;
+  }
+}
+
+// workouts.json does not exist until the first workout is logged.
+async function loadWorkouts() {
+  try {
+    const file = await storage.load(WORKOUTS_PATH);
+    return { sessions: normalizeWorkouts(file.data), sha: file.sha };
+  } catch (error) {
+    if (error.kind === "missing") return { sessions: [], sha: null };
     throw error;
   }
 }
@@ -157,12 +181,13 @@ async function start() {
     return;
   }
   forgetEl.hidden = false;
-  let file, books;
+  let file, books, workouts;
   try {
     file = await storage.load(JOURNAL_PATH);
     books = await loadBooks();
+    workouts = await loadWorkouts();
   } catch (error) {
-    if (!error.kind) { showUnreadable(); return; } // books.json is not in a shape we understand
+    if (!error.kind) { showUnreadable(); return; } // books.json or workouts.json is not in a shape we understand
     if (error.kind === "auth") showSetup(BAD_TOKEN, start);
     else if (error.kind === "invalid") showUnreadable();
     else if (error.kind === "missing") showUnreadable(MISSING);
@@ -184,6 +209,7 @@ async function start() {
     sha: file.sha, todos: journal.todos, workTodos: journal.workTodos, wishlist: journal.wishlist,
     suggestions: suggestions.items, todoSuggestions: suggestions.todos,
     books: books.books, booksSha: books.sha,
+    sessions: workouts.sessions, workoutsSha: workouts.sha,
   });
   showAlert(null);
   statusEl.textContent = "Saved";
@@ -199,14 +225,16 @@ async function refreshIfStale() {
   if (!loaded || document.hidden || !saver.isIdle()) return;
   const shaBefore = state.sha;
   const booksShaBefore = state.booksSha;
+  const workoutsShaBefore = state.workoutsSha;
   try {
     const file = await storage.load(JOURNAL_PATH);
     const journal = normalizeJournal(file.data);
     const books = await loadBooks();
+    const workouts = await loadWorkouts();
     const suggestions = await loadSuggestions();
     // An edit was saved from this page while we were loading: the copy we fetched may be
     // the older one, so it must not replace what is on screen.
-    if (state.sha !== shaBefore || state.booksSha !== booksShaBefore) return;
+    if (state.sha !== shaBefore || state.booksSha !== booksShaBefore || state.workoutsSha !== workoutsShaBefore) return;
     // Accepted here but not yet cleared in the data repo: keep them hidden.
     for (const id of Object.keys(suggestions.items)) {
       if (acceptedQueue.has(id)) delete suggestions.items[id];
@@ -220,8 +248,10 @@ async function refreshIfStale() {
     const suggestionsMoved =
       JSON.stringify([suggestions.items, suggestions.todos]) !== JSON.stringify([state.suggestions, state.todoSuggestions]);
     const booksMoved = books.sha !== state.booksSha;
-    if ((journalMoved || suggestionsMoved || booksMoved) && saver.isIdle()) {
+    const workoutsMoved = workouts.sha !== state.workoutsSha;
+    if ((journalMoved || suggestionsMoved || booksMoved || workoutsMoved) && saver.isIdle()) {
       if (booksMoved) Object.assign(state, { books: books.books, booksSha: books.sha });
+      if (workoutsMoved) Object.assign(state, { sessions: workouts.sessions, workoutsSha: workouts.sha });
       if (journalMoved) Object.assign(state, { sha: file.sha, todos: journal.todos, workTodos: journal.workTodos, wishlist: journal.wishlist });
       Object.assign(state, { suggestions: suggestions.items, todoSuggestions: suggestions.todos });
       show(currentTab);

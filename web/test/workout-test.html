@@ -1,0 +1,143 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>workout tests</title>
+<pre id="out">Running…</pre>
+<main id="view" data-tab="workout"></main>
+<script type="module">
+  const failures = [];
+  let count = 0;
+  const check = (name, ok) => { count++; if (!ok) failures.push(`FAIL ${name}`); };
+
+  try {
+    const m = await import("../workout-model.js");
+    const { renderWorkout, describeSets } = await import("../workout.js");
+    const { todayISO } = await import("../format.js");
+    const { WORKOUTS_PATH } = await import("../config.js");
+    const { ROUTINE } = m;
+
+    check("workouts are kept in their own file", WORKOUTS_PATH === "workouts.json");
+    check("each workout has five exercises of three sets", ["A", "B"].every((k) => ROUTINE[k].exercises.length === 5 && ROUTINE[k].exercises.every((e) => e.sets === 3 && e.min < e.max)));
+
+    // ---- model ----
+    const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+    check("a file without a sessions list is refused", throws(() => m.normalizeWorkouts({})) && throws(() => m.normalizeWorkouts(null)) && throws(() => m.normalizeWorkouts({ sessions: "x" })));
+    {
+      const full = { id: "s1", date: "2026-11-17", workout: "B", notes: "Felt good", exercises: [{ key: "bb-rdl", sets: [{ weight: 40, reps: 10 }, { weight: 40, reps: null }] }] };
+      check("a complete session is kept as it is", JSON.stringify(m.normalizeWorkouts({ sessions: [full] })) === JSON.stringify([full]));
+      const repaired = m.normalizeWorkouts({ sessions: [{ date: "yesterday", workout: "C", exercises: [{ key: "x", sets: [{ weight: "20", reps: 9.6 }, { weight: -1, reps: "abc" }, "junk"] }] }, null] });
+      check("a hand-edited session is repaired",
+        repaired.length === 1 && repaired[0].date === "" && repaired[0].workout === "A" && repaired[0].notes === "" && repaired[0].id.length > 0 &&
+        JSON.stringify(repaired[0].exercises[0].sets) === JSON.stringify([{ weight: 20, reps: 10 }, { weight: null, reps: null }]));
+      check("typed numbers are tidied", [m.toNumber("22,5"), m.toNumber(""), m.toNumber("abc"), m.toNumber("-3"), m.toNumber("8.4", { whole: true }), m.toNumber(0)].join("|") === "22.5||||8|0");
+    }
+
+    const sets = (weight, ...reps) => reps.map((r) => ({ weight, reps: r }));
+    const sessionOf = (id, date, workout, entries) => ({ id, date, workout, notes: "", exercises: Object.entries(entries).map(([key, s]) => ({ key, sets: s })) });
+
+    check("the first workout is A", m.nextWorkout([]) === "A");
+    {
+      const log = [sessionOf("1", "2026-11-16", "A", {}), sessionOf("2", "2026-11-18", "B", {}), sessionOf("3", "2026-11-10", "B", {})];
+      check("sessions sort newest first", m.sortedSessions(log).map((s) => s.id).join(",") === "2,1,3");
+      check("after a B comes an A, going by date", m.nextWorkout(log) === "A");
+      check("after an A comes a B", m.nextWorkout(log.slice(0, 1)) === "B");
+      check("sessions this week count Monday to Sunday", m.sessionsThisWeek(log, "2026-11-19") === 2 && m.sessionsThisWeek(log, "2026-11-22") === 2 && m.sessionsThisWeek(log, "2026-11-23") === 0 && m.sessionsThisWeek(log, "2026-11-15") === 1);
+    }
+
+    const squat = ROUTINE.A.exercises.find((e) => e.key === "goblet-squat");
+    {
+      const s1 = sessionOf("1", "2026-11-10", "A", { "goblet-squat": sets(16, 12, 12, 12) });
+      const s2 = sessionOf("2", "2026-11-14", "A", { "goblet-squat": sets(20, 9, 8, null) });
+      const s3 = sessionOf("3", "2026-11-18", "A", { "goblet-squat": sets(20, null, null, null) });
+      const log = [s1, s2, s3];
+      const prevToday = m.previousSets(log, "goblet-squat");
+      check("the latest session with sets done counts as last time, skipping blank ones", prevToday.date === "2026-11-14" && prevToday.sets.length === 2);
+      check("last time, as seen from a past session, is the one before it", m.previousSets(log, "goblet-squat", s2).date === "2026-11-10");
+      check("an exercise never done has no last time", m.previousSets(log, "bb-row") === null);
+      check("never done: start light", m.advice(squat, null).kind === "start");
+      check("every set at the top of the range: go heavier", m.advice(squat, m.previousSets(log, "goblet-squat", s2)).kind === "heavier");
+      check("short of the top: same weight", m.advice(squat, prevToday).kind === "same" && m.advice(squat, prevToday).weight === 20);
+      check("too few sets done is not a reason to go heavier", m.advice(squat, { date: "x", sets: sets(16, 12, 12) }).kind === "same");
+
+      const fresh = m.newSession(log, "A", "2026-11-19");
+      check("a new session has every exercise of its workout with blank reps",
+        fresh.workout === "A" && fresh.date === "2026-11-19" && fresh.exercises.map((e) => e.key).join(",") === ROUTINE.A.exercises.map((e) => e.key).join(",") &&
+        fresh.exercises.every((e) => e.sets.length === 3 && e.sets.every((s) => s.reps === null)));
+      check("a new session starts at last time's weight, blank if never done",
+        fresh.exercises[0].sets.every((s) => s.weight === 20) && fresh.exercises[1].sets.every((s) => s.weight === null));
+
+      const progress = m.progressSummary(log);
+      check("progress shows the first and latest weight of each exercise done", progress.length === 1 && progress[0].firstWeight === 16 && progress[0].latestWeight === 20 && progress[0].latestReps === 9 && progress[0].sessions === 2);
+    }
+    check("sets read plainly", describeSets(squat, sets(20, 12, 11)) === "20 kg × 12, 11" &&
+      describeSets(ROUTINE.A.exercises[4], sets(null, 45, 40)) === "45 s, 40 s" &&
+      describeSets(squat, [{ weight: 16, reps: 12 }, { weight: 20, reps: 8 }]) === "16 kg × 12, 20 kg × 8");
+
+    // ---- the tab ----
+    const view = document.getElementById("view");
+    const $ = (sel) => view.querySelector(sel);
+    const $$ = (sel) => [...view.querySelectorAll(sel)];
+    const type = (input, text) => { input.value = text; input.dispatchEvent(new Event("input", { bubbles: true })); };
+    const state = { sessions: [] };
+    let changes = 0;
+    const render = () => { view.replaceChildren(); renderWorkout(view, state, () => { changes++; }); };
+    render();
+
+    check("an empty log says so and offers Workout A", /No workouts logged yet/.test(view.textContent) && $(".workout-start").textContent === "Start Workout A" && $(".workout-other").textContent === "Do B instead");
+    check("the plan is open while nothing is logged", $(".plan").open && /Workout A/.test($(".plan").textContent) && /Workout B/.test($(".plan").textContent));
+    check("no progress table until something is logged", !$(".progress-table"));
+    check("the count starts at zero", $(".workout-count").textContent === "This week: 0 of 3 · 0 workouts logged");
+
+    $(".workout-start").click();
+    check("Start logs a new Workout A for today, opens it and asks for a save",
+      state.sessions.length === 1 && state.sessions[0].workout === "A" && state.sessions[0].date === todayISO() && changes === 1 && $(".session.open .session-editor"));
+    check("the open session lists five exercises with three sets each", $$(".exercise").length === 5 && $$(".exercise").every((e) => e.querySelectorAll(".set-row").length === 3));
+    check("a first-time exercise says how to pick a weight", $(".exercise-advice").classList.contains("advice-start"));
+    check("the header now counts the workout and offers B next", $(".workout-count").textContent === "This week: 1 of 3 · 1 workout logged" && $(".workout-start").textContent === "Start Workout B");
+
+    const first = $$(".exercise")[0];
+    type(first.querySelector(".set-weight"), "16");
+    type(first.querySelector(".set-reps"), "12");
+    check("typing weight and reps updates the set and asks for a save",
+      state.sessions[0].exercises[0].sets[0].weight === 16 && state.sessions[0].exercises[0].sets[0].reps === 12 && changes === 3);
+    check("the row shows how many sets are done", $(".session.open .session-summary").textContent === "1 of 15 sets done");
+    for (const [i, input] of [...first.querySelectorAll(".set-reps")].entries()) if (i) type(input, "12");
+    for (const [i, input] of [...first.querySelectorAll(".set-weight")].entries()) if (i) type(input, "16");
+
+    first.querySelector(".set-add").click();
+    check("+ Set adds a set at the same weight", state.sessions[0].exercises[0].sets.length === 4 && state.sessions[0].exercises[0].sets[3].weight === 16 && first.querySelectorAll(".set-row").length === 4);
+    first.querySelectorAll(".set-remove")[3].click();
+    check("× removes a set", state.sessions[0].exercises[0].sets.length === 3);
+
+    type($(".session-date-input"), "2026-11-16");
+    type($(".session-notes"), "Easy");
+    check("the date and notes can be changed", state.sessions[0].date === "2026-11-16" && state.sessions[0].notes === "Easy");
+    $(".session-done").click();
+    check("Done closes the session", !$(".session-editor") && $(".session-date").textContent === "Mon 16 Nov 2026");
+
+    // Two A sessions later: the squat at 16 kg × 12 on every set says go heavier.
+    $(".workout-other").click();
+    check("Do A instead starts an A out of turn", state.sessions[1].workout === "A");
+    const sq = $$(".exercise")[0];
+    check("last time's weights are filled in", [...sq.querySelectorAll(".set-weight")].every((i) => i.value === "16"));
+    check("last time is shown", /Last time \(Mon 16 Nov\): 16 kg × 12, 12, 12/.test(sq.querySelector(".exercise-last").textContent));
+    check("hitting the top of the range on every set says go heavier", sq.querySelector(".exercise-advice").classList.contains("advice-heavier") && /Go heavier/.test(sq.querySelector(".exercise-advice").textContent));
+    check("the progress table appears once something is logged", $(".progress-table") && /Goblet squat/.test($(".progress-table").textContent));
+
+    const realConfirm = window.confirm;
+    window.confirm = () => false;
+    $(".session-delete").click();
+    check("Delete does nothing unless confirmed", state.sessions.length === 2);
+    window.confirm = () => true;
+    changes = 0;
+    $(".session-delete").click();
+    window.confirm = realConfirm;
+    check("a confirmed Delete removes the workout and asks for a save", state.sessions.length === 1 && changes === 1 && !$(".session-editor"));
+    render();
+    check("the plan is folded away once workouts are logged", !$(".plan").open);
+  } catch (e) {
+    failures.push(`FAIL test page crashed: ${e}`);
+  }
+
+  document.getElementById("view").replaceChildren();
+  document.getElementById("out").textContent = failures.length ? failures.join("\n") : `All ${count} passed`;
+</script>
