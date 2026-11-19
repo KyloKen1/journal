@@ -10,26 +10,29 @@ export const ROUTINE = {
   A: {
     name: "Workout A",
     exercises: [
-      { key: "goblet-squat", name: "Goblet squat", gear: "Kettlebell or dumbbell", sets: 3, min: 8, max: 12, step: "the next bell up" },
-      { key: "db-bench", name: "Dumbbell bench press", gear: "Dumbbells (floor press if no bench)", sets: 3, min: 8, max: 12, step: "2 kg per hand" },
-      { key: "bb-row", name: "Barbell bent-over row", gear: "Barbell", sets: 3, min: 8, max: 12, step: "2.5 kg" },
-      { key: "kb-swing", name: "Kettlebell swing", gear: "Kettlebell", sets: 3, min: 12, max: 20, step: "the next bell up" },
-      { key: "plank", name: "Plank", gear: "Bodyweight", sets: 3, min: 30, max: 60, timed: true, step: "10 seconds a set" },
+      { key: "goblet-squat", demo: "goblet squat proper form", name: "Goblet squat", gear: "Kettlebell or dumbbell", sets: 3, min: 8, max: 12, step: "the next bell up" },
+      { key: "db-bench", demo: "dumbbell bench press proper form", name: "Dumbbell bench press", gear: "Dumbbells (floor press if no bench)", sets: 3, min: 8, max: 12, step: "2 kg per hand" },
+      { key: "bb-row", demo: "barbell bent over row proper form", name: "Barbell bent-over row", gear: "Barbell", sets: 3, min: 8, max: 12, step: "2.5 kg" },
+      { key: "kb-swing", demo: "kettlebell swing proper form", name: "Kettlebell swing", gear: "Kettlebell", sets: 3, min: 12, max: 20, step: "the next bell up" },
+      { key: "plank", demo: "plank proper form", name: "Plank", gear: "Bodyweight", sets: 3, min: 30, max: 60, timed: true, step: "10 seconds a set" },
     ],
   },
   B: {
     name: "Workout B",
     exercises: [
-      { key: "bb-rdl", name: "Barbell Romanian deadlift", gear: "Barbell", sets: 3, min: 8, max: 12, step: "5 kg" },
-      { key: "db-ohp", name: "Standing dumbbell shoulder press", gear: "Dumbbells", sets: 3, min: 8, max: 12, step: "1–2 kg per hand" },
-      { key: "db-lunge", name: "Dumbbell reverse lunge (each leg)", gear: "Dumbbells", sets: 3, min: 8, max: 12, step: "2 kg per hand" },
-      { key: "db-row", name: "One-arm dumbbell row (each arm)", gear: "Dumbbell", sets: 3, min: 8, max: 12, step: "2 kg" },
-      { key: "farmer-carry", name: "Farmer's carry", gear: "Heavy dumbbells or kettlebells", sets: 3, min: 30, max: 45, timed: true, step: "2–4 kg per hand" },
+      { key: "bb-rdl", demo: "barbell romanian deadlift proper form", name: "Barbell Romanian deadlift", gear: "Barbell", sets: 3, min: 8, max: 12, step: "5 kg" },
+      { key: "db-ohp", demo: "standing dumbbell shoulder press proper form", name: "Standing dumbbell shoulder press", gear: "Dumbbells", sets: 3, min: 8, max: 12, step: "1–2 kg per hand" },
+      { key: "db-lunge", demo: "dumbbell reverse lunge proper form", name: "Dumbbell reverse lunge (each leg)", gear: "Dumbbells", sets: 3, min: 8, max: 12, step: "2 kg per hand" },
+      { key: "db-row", demo: "one arm dumbbell row proper form", name: "One-arm dumbbell row (each arm)", gear: "Dumbbell", sets: 3, min: 8, max: 12, step: "2 kg" },
+      { key: "farmer-carry", demo: "farmer's carry proper form", name: "Farmer's carry", gear: "Heavy dumbbells or kettlebells", sets: 3, min: 30, max: 45, timed: true, step: "2–4 kg per hand" },
     ],
   },
 };
 
 export const WORKOUTS_PER_WEEK = 3;
+
+// A page of form videos for the exercise, so there is always a working example to watch.
+export const demoLink = (exercise) => `https://www.youtube.com/results?search_query=${encodeURIComponent(exercise.demo)}`;
 
 const isObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 const text = (v) => (typeof v === "string" ? v : "");

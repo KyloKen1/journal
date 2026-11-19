@@ -83,6 +83,12 @@
     render();
 
     check("an empty log says so and offers Workout A", /No workouts logged yet/.test(view.textContent) && $(".workout-start").textContent === "Start Workout A" && $(".workout-other").textContent === "Do B instead");
+    {
+      const links = $$(".plan .how-to");
+      check("every exercise in the plan links to a how-to example in a new tab",
+        links.length === 10 && links.every((l) => l.href.startsWith("https://www.youtube.com/results?search_query=") && l.href.includes("proper%20form") && l.target === "_blank" && l.rel === "noopener noreferrer"));
+      check("each link searches for its own exercise", new Set(links.map((l) => l.href)).size === 10 && links[0].href.includes("goblet%20squat"));
+    }
     check("the plan is open while nothing is logged", $(".plan").open && /Workout A/.test($(".plan").textContent) && /Workout B/.test($(".plan").textContent));
     check("no progress table until something is logged", !$(".progress-table"));
     check("the count starts at zero", $(".workout-count").textContent === "This week: 0 of 3 · 0 workouts logged");
@@ -91,6 +97,7 @@
     check("Start logs a new Workout A for today, opens it and asks for a save",
       state.sessions.length === 1 && state.sessions[0].workout === "A" && state.sessions[0].date === todayISO() && changes === 1 && $(".session.open .session-editor"));
     check("the open session lists five exercises with three sets each", $$(".exercise").length === 5 && $$(".exercise").every((e) => e.querySelectorAll(".set-row").length === 3));
+    check("each exercise being logged has its how-to link", $$(".exercise").every((e) => e.querySelector(".exercise-head .how-to")));
     check("a first-time exercise says how to pick a weight", $(".exercise-advice").classList.contains("advice-start"));
     check("the header now counts the workout and offers B next", $(".workout-count").textContent === "This week: 1 of 3 · 1 workout logged" && $(".workout-start").textContent === "Start Workout B");
 

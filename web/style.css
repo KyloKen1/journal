@@ -379,6 +379,9 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
 .set-input { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
 .set-input input { width: 4.5em; text-align: right; font-variant-numeric: tabular-nums; }
 .set-add { font-size: 13px; padding: 4px 10px; }
+.how-to { color: var(--accent); font-size: 13px; text-decoration: none; white-space: nowrap; }
+.how-to:hover { text-decoration: underline; }
+.exercise-head .how-to { margin-left: auto; }
 @media (max-width: 700px) {
   .tabs { overflow-x: auto; }
   .tabs button { padding-left: 8px; padding-right: 8px; }

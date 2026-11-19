@@ -3,7 +3,7 @@ import { el } from "./dom.js";
 import { todayISO } from "./format.js";
 import { formatCheckedDate } from "./suggest.js";
 import {
-  ROUTINE, WORKOUTS_PER_WEEK, advice, newSession, nextWorkout, previousSets, progressSummary,
+  ROUTINE, WORKOUTS_PER_WEEK, advice, demoLink, newSession, nextWorkout, previousSets, progressSummary,
   sessionsThisWeek, sortedSessions, toNumber,
 } from "./workout-model.js";
 
@@ -13,6 +13,11 @@ let openId = null;
 const range = (ex) => `${ex.sets} × ${ex.min}–${ex.max}${ex.timed ? " s" : " reps"}`;
 const kg = (n) => (n === null || n === undefined ? "" : `${n} kg`);
 const longDate = (iso) => (iso ? `${formatCheckedDate(iso)} ${iso.slice(0, 4)}` : "No date");
+// Opens in a new tab, so a workout being logged stays open.
+const howTo = (exercise) => el("a", {
+  class: "how-to", href: demoLink(exercise), target: "_blank", rel: "noopener noreferrer",
+  "aria-label": `How to do ${exercise.name} (opens in a new tab)`,
+}, "How to do it ↗");
 const exerciseFor = (session, key) => ROUTINE[session.workout].exercises.find((ex) => ex.key === key);
 
 // "20 kg × 12, 12, 10" — or "45 s, 40 s" for a timed exercise without weight.
@@ -197,6 +202,7 @@ export function renderWorkout(root, state, changed) {
       el("div", { class: "exercise-head" },
         el("span", { class: "exercise-name" }, exercise.name),
         el("span", { class: "exercise-target muted" }, range(exercise)),
+        howTo(exercise),
       ),
       el("p", { class: "exercise-last muted" },
         previous ? `Last time (${formatCheckedDate(previous.date)}): ${describeSets(exercise, previous.sets)}` : `${exercise.gear}. Not done before.`),
@@ -222,7 +228,7 @@ function renderPlan(open) {
     el("h4", {}, ROUTINE[key].name),
     el("table", { class: "plan-table" },
       el("tbody", {}, ROUTINE[key].exercises.map((ex) => el("tr", {},
-        el("td", {}, ex.name, el("div", { class: "muted plan-gear" }, ex.gear)),
+        el("td", {}, ex.name, el("div", { class: "muted plan-gear" }, ex.gear, " · ", howTo(ex))),
         el("td", { class: "num" }, range(ex)),
       ))),
     ),
@@ -233,6 +239,7 @@ function renderPlan(open) {
       el("li", {}, "Three workouts a week on days that aren't back to back, such as Mon, Wed and Fri. Alternate A and B: A B A one week, B A B the next."),
       el("li", {}, "Warm up for 5 minutes first: brisk walk or skipping, then 10 bodyweight squats, 10 hip hinges and arm circles. Do a light set of your first exercise."),
       el("li", {}, "Rest 1½–2 minutes between sets. A session takes about 45 minutes."),
+      el("li", {}, "New to an exercise? Tap How to do it to watch it done properly before adding weight."),
       el("li", {}, "Every set should end with 1–3 reps left in the tank. Good form comes before more weight."),
       el("li", {}, "How to progress: stay at a weight until you reach the top of the range on every set, then go heavier and work back up. The log tells you when."),
       el("li", {}, "For the desk days: get up every hour, and do a 1-minute hip-flexor stretch on each side and 10 band pull-aparts or wall slides."),
